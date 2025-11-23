@@ -20,6 +20,7 @@ class ToolOverride(TypedDict, total=False):
     description: str
     defaults: dict[str, Any]
     hide_fields: list[str]
+    output_schema: dict[str, Any]
 
 
 def load_named_server_configs_from_file(
@@ -125,7 +126,7 @@ def load_named_server_configs_from_file(
                 continue
             
             # Validate allowed keys
-            valid_keys = {"rename", "description", "defaults", "hide_fields"}
+            valid_keys = {"rename", "description", "defaults", "hide_fields", "output_schema"}
             unknown_keys = set(override_config.keys()) - valid_keys
             if unknown_keys:
                 logger.warning(
@@ -134,12 +135,20 @@ def load_named_server_configs_from_file(
                     unknown_keys,
                 )
 
-            tool_overrides[tool_name] = ToolOverride(
-                rename=override_config.get("rename"),  # type: ignore
-                description=override_config.get("description"),  # type: ignore
-                defaults=override_config.get("defaults"),  # type: ignore
-                hide_fields=override_config.get("hide_fields"),  # type: ignore
-            )
+            # Construct ToolOverride only with present keys
+            override: ToolOverride = {}
+            if "rename" in override_config:
+                override["rename"] = override_config["rename"]
+            if "description" in override_config:
+                override["description"] = override_config["description"]
+            if "defaults" in override_config:
+                override["defaults"] = override_config["defaults"]
+            if "hide_fields" in override_config:
+                override["hide_fields"] = override_config["hide_fields"]
+            if "output_schema" in override_config:
+                override["output_schema"] = override_config["output_schema"]
+
+            tool_overrides[tool_name] = override
             logger.info("Loaded override for tool '%s'", tool_name)
     else:
         logger.warning("'overrides' section is not a dictionary. Skipping.")

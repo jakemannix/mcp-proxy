@@ -288,7 +288,7 @@ async def test_run_mcp_server_with_default_server(
 
         # Verify calls
         mock_stdio_client.assert_called_once_with(mock_stdio_params)
-        mock_create_proxy.assert_called_once_with(mock_session)
+        mock_create_proxy.assert_called_once_with(mock_session, None)
         mock_create_routes.assert_called_once_with(
             mock_proxy,
             stateless_instance=mock_settings.stateless,
@@ -345,6 +345,9 @@ async def test_run_mcp_server_with_named_servers(
         assert mock_stdio_client.call_count == 2
         assert mock_create_proxy.call_count == 2
         assert mock_create_routes.call_count == 2
+        
+        # Both calls should be with None for overrides
+        mock_create_proxy.assert_any_call(mock_session, None)
 
         # Check that named servers were logged
         mock_logger.info.assert_any_call(

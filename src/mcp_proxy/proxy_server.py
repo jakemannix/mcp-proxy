@@ -109,6 +109,7 @@ async def create_proxy_server(
                     
                     defaults = override.get("defaults", {})
                     hide_fields = override.get("hide_fields", [])
+                    output_schema = override.get("output_schema")
                     
                     if "properties" in new_input_schema and isinstance(new_input_schema["properties"], dict):
                         props = new_input_schema["properties"]
@@ -127,11 +128,20 @@ async def create_proxy_server(
                             if f not in hide_fields and f not in defaults
                         ]
 
-                    modified_tools.append(types.Tool(
-                        name=new_name,
-                        description=new_description,
-                        inputSchema=new_input_schema
-                    ))
+                    tool_args = {
+                        "name": new_name,
+                        "description": new_description,
+                        "inputSchema": new_input_schema
+                    }
+                    
+                    # Apply outputSchema override if present
+                    if output_schema:
+                        tool_args["outputSchema"] = output_schema
+                    # Otherwise pass through existing outputSchema (if SDK supports it)
+                    elif hasattr(tool, "outputSchema") and tool.outputSchema:
+                        tool_args["outputSchema"] = tool.outputSchema
+
+                    modified_tools.append(types.Tool(**tool_args))
                 else:
                     modified_tools.append(tool)
             
@@ -174,6 +184,22 @@ async def create_proxy_server(
                     original_name,
                     arguments,
                 )
+                
+                # Apply output projection if override exists and result has structuredContent
+                if (active_override and 
+                    active_override.get("output_schema") and 
+                    hasattr(result, "structuredContent") and 
+                    isinstance(result.structuredContent, dict)):
+                    
+                    output_schema = active_override["output_schema"]
+                    if "properties" in output_schema and isinstance(output_schema["properties"], dict):
+                        allowed_keys = output_schema["properties"].keys()
+                        filtered_content = {
+                            k: v for k, v in result.structuredContent.items() 
+                            if k in allowed_keys
+                        }
+                        result.structuredContent = filtered_content
+
                 return types.ServerResult(result)
             except Exception as e:  # noqa: BLE001
                 return types.ServerResult(
