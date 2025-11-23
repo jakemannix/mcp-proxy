@@ -21,6 +21,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import BaseRoute, Mount, Route
 from starlette.types import Receive, Scope, Send
 
+from .config_loader import ToolOverride
 from .proxy_server import create_proxy_server
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,7 @@ async def run_mcp_server(
     mcp_settings: MCPServerSettings,
     default_server_params: StdioServerParameters | None = None,
     named_server_params: dict[str, StdioServerParameters] | None = None,
+    tool_overrides: dict[str, ToolOverride] | None = None,
 ) -> None:
     """Run stdio client(s) and expose an MCP server with multiple possible backends."""
     if named_server_params is None:
@@ -169,7 +171,7 @@ async def run_mcp_server(
             )
             stdio_streams = await stack.enter_async_context(stdio_client(default_server_params))
             session = await stack.enter_async_context(ClientSession(*stdio_streams))
-            proxy = await create_proxy_server(session)
+            proxy = await create_proxy_server(session, tool_overrides)
 
             instance_routes, http_manager = create_single_instance_routes(
                 proxy,
@@ -189,7 +191,7 @@ async def run_mcp_server(
             )
             stdio_streams_named = await stack.enter_async_context(stdio_client(params))
             session_named = await stack.enter_async_context(ClientSession(*stdio_streams_named))
-            proxy_named = await create_proxy_server(session_named)
+            proxy_named = await create_proxy_server(session_named, tool_overrides)
 
             instance_routes_named, http_manager_named = create_single_instance_routes(
                 proxy_named,

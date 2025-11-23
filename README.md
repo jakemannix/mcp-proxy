@@ -202,6 +202,16 @@ The JSON file should follow this structure:
       },
       "transportType": "stdio"
     }
+  },
+  "overrides": {
+    "fetch:fetch_forecast": {
+      "rename": "get_weather",
+      "description": "Get the weather for a city",
+      "defaults": {
+        "api_key": "secret"
+      },
+      "hide_fields": ["api_key"]
+    }
   }
 }
 ```
@@ -211,6 +221,11 @@ The JSON file should follow this structure:
 - `args`: (Optional) A list of arguments for the command. Defaults to an empty list.
 - `enabled`: (Optional) If `false`, this server definition will be skipped. Defaults to `true`.
 - `timeout` and `transportType`: These fields are present in standard MCP client configurations but are currently **ignored** by `mcp-proxy` when loading named servers. The transport type is implicitly "stdio".
+- `overrides`: (Optional) A dictionary where keys are original tool names and values define:
+  - `rename`: (Optional) New name for the tool.
+  - `description`: (Optional) New description.
+  - `defaults`: (Optional) Dictionary of default values to inject. These fields are removed from the schema exposed to the client.
+  - `hide_fields`: (Optional) List of field names to hide from the schema.
 
 ## Installation
 
