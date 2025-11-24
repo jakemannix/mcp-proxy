@@ -21,6 +21,7 @@ from mcp.client.stdio import StdioServerParameters
 
 from .config_loader import ToolOverride, load_named_server_configs_from_file
 from .mcp_server import MCPServerSettings, run_mcp_server
+from .registry.cli import generate_card
 from .sse_client import run_sse_client
 from .streamablehttp_client import run_streamablehttp_client
 
@@ -79,6 +80,18 @@ def _add_arguments_to_parser(parser: argparse.ArgumentParser) -> None:
         action="version",
         version=f"%(prog)s {package_version}",
         help="Show the version and exit",
+    )
+
+    parser.add_argument(
+        "--generate-card",
+        help="Generate an AgentCard for the specified Agent ID and Version (format: id:version).",
+        metavar="ID:VERSION",
+    )
+
+    parser.add_argument(
+        "--output-file",
+        help="Output file for the generated AgentCard.",
+        default=None,
     )
 
     parser.add_argument(
@@ -434,6 +447,42 @@ def main() -> None:
     parser = _setup_argument_parser()
     args_parsed = parser.parse_args()
     logger = _setup_logging(level=args_parsed.log_level, debug=args_parsed.debug)
+
+    # Handle AgentCard generation
+    if args_parsed.generate_card:
+        if ":" not in args_parsed.generate_card:
+            logger.error("Invalid format for --generate-card. Use 'id:version'.")
+            sys.exit(1)
+
+        agent_id, version = args_parsed.generate_card.split(":", 1)
+
+        # Determine connection mode
+        command = args_parsed.command_or_url
+        is_url = command and command.startswith(("http://", "https://"))
+
+        if not command:
+            logger.error("A command or URL must be provided to generate a card.")
+            sys.exit(1)
+
+        # Prepare environment for stdio mode
+        env = {}
+        if args_parsed.pass_environment:
+            env.update(os.environ)
+        if args_parsed.env:
+            env.update(dict(args_parsed.env))
+
+        asyncio.run(
+            generate_card(
+                agent_id=agent_id,
+                version=version,
+                command=None if is_url else command,
+                args=args_parsed.args if not is_url else None,
+                env=env if not is_url else None,
+                url=command if is_url else None,
+                output_file=args_parsed.output_file,
+            )
+        )
+        return
 
     # Validate required arguments
     if (

@@ -1,8 +1,14 @@
 # MCP Sidecar Proxy & Tool Composition
 
-The **MCP Sidecar Proxy** acts as an intermediary "composition layer" between your AI Agent (the MCP Client) and the underlying MCP Servers (the tools).
 
-It solves the "N×M Problem" where Agent Builders need to reshape standard tools to fit their specific agent's persona or context window without asking the Service Owner to change their API.
+The **MCP Sidecar Proxy** provides the abstraction layer necessary to treat Agent building as "programming in natural language."
+
+If we consider Large Language Models (LLMs) as an Operating System, then the prompt we feed them is the "program." In this paradigm, MCP servers act as software libraries—"peripherals" that extend the OS's capabilities.
+
+However, raw MCP integration is akin to unrolling a library's source code and pasting it directly into your program's `main()` function. It solves the "N×M Problem" of connecting many tools to many clients, but does so with tight coupling: the Agent Builder must accept the Tool Builder's exact implementation, variable names, and complexity.
+
+The Sidecar Proxy acts as a composition layer that allows Agent Builders to wrap these raw "libraries" in controlled functions. It lets you define the interface your "program" (the Agent) interacts with, reshaping standard tools to fit your specific context without requiring changes from the underlying Service Owner.
+
 
 ## Core Capabilities
 
