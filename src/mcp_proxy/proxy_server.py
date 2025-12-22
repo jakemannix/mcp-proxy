@@ -9,8 +9,9 @@ import typing as t
 
 from mcp import server, types
 from mcp.client.session import ClientSession
-
 from typing import TypedDict
+
+from .output_transformer import apply_output_projection, strip_source_fields
 
 class ToolOverride(TypedDict, total=False):
     """Configuration for overriding tool behavior."""
@@ -142,9 +143,9 @@ async def create_proxy_server(
                         "inputSchema": new_input_schema
                     }
                     
-                    # Apply outputSchema override if present
+                    # Apply outputSchema override if present (strip source_field metadata)
                     if output_schema:
-                        tool_args["outputSchema"] = output_schema
+                        tool_args["outputSchema"] = strip_source_fields(output_schema)
                     # Otherwise pass through existing outputSchema (if SDK supports it)
                     elif hasattr(tool, "outputSchema") and tool.outputSchema:
                         tool_args["outputSchema"] = tool.outputSchema
@@ -194,19 +195,15 @@ async def create_proxy_server(
                 )
                 
                 # Apply output projection if override exists and result has structuredContent
-                if (active_override and 
-                    active_override.get("output_schema") and 
-                    hasattr(result, "structuredContent") and 
+                if (active_override and
+                    active_override.get("output_schema") and
+                    hasattr(result, "structuredContent") and
                     isinstance(result.structuredContent, dict)):
-                    
+
                     output_schema = active_override["output_schema"]
-                    if "properties" in output_schema and isinstance(output_schema["properties"], dict):
-                        allowed_keys = output_schema["properties"].keys()
-                        filtered_content = {
-                            k: v for k, v in result.structuredContent.items() 
-                            if k in allowed_keys
-                        }
-                        result.structuredContent = filtered_content
+                    result.structuredContent = apply_output_projection(
+                        result.structuredContent, output_schema
+                    )
 
                 return types.ServerResult(result)
             except Exception as e:  # noqa: BLE001

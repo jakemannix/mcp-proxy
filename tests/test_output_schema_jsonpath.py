@@ -1,15 +1,16 @@
 """Tests for JSONPath-based output schema field mapping.
 
 These tests define the target behavior for extracting nested fields from
-tool outputs using JSONPath-like expressions in the `source_field` property.
+tool outputs using standard JSONPath expressions in the `source_field` property.
 
 Example config:
     "output_schema": {
-        "temperature": { "type": "number", "source_field": "raw_sensor_dump.data.temp" },
-        "conditions": { "type": "string", "source_field": "raw_sensor_dump.description" }
+        "temperature": { "type": "number", "source_field": "$.raw_sensor_dump.data.temp" },
+        "conditions": { "type": "string", "source_field": "$.raw_sensor_dump.description" }
     }
 
 This allows flattening deeply nested responses into clean, agent-friendly structures.
+Uses standard JSONPath syntax via the jsonpath-ng library.
 """
 
 import typing as t
@@ -86,7 +87,7 @@ async def test_jsonpath_simple_nested_extraction(
                 "properties": {
                     "conditions": {
                         "type": "string",
-                        "source_field": "raw_sensor_dump.description"
+                        "source_field": "$.raw_sensor_dump.description"
                     }
                 }
             }
@@ -136,11 +137,11 @@ async def test_jsonpath_deeply_nested_extraction(
                 "properties": {
                     "temperature": {
                         "type": "number",
-                        "source_field": "raw_sensor_dump.data.temp"
+                        "source_field": "$.raw_sensor_dump.data.temp"
                     },
                     "humidity": {
                         "type": "number",
-                        "source_field": "raw_sensor_dump.data.humidity"
+                        "source_field": "$.raw_sensor_dump.data.humidity"
                     }
                 }
             }
@@ -189,7 +190,7 @@ async def test_jsonpath_mixed_with_toplevel(
                     # This uses source_field for nested extraction
                     "temp": {
                         "type": "number",
-                        "source_field": "raw_sensor_dump.data.temp"
+                        "source_field": "$.raw_sensor_dump.data.temp"
                     },
                     # This has no source_field, so should pass through if present at top level
                     # (or be omitted if not present)
@@ -228,11 +229,11 @@ async def test_jsonpath_mixed_with_toplevel(
 
 
 @pytest.mark.asyncio
-async def test_jsonpath_missing_source_field_returns_null(
+async def test_jsonpath_missing_source_field_omits_field(
     server_with_nested_output: Server[object],
     tool_callback: AsyncMock
 ) -> None:
-    """Test that missing source_field paths return null, not error."""
+    """Test that missing source_field paths result in omitted fields, not errors."""
     overrides: dict[str, ToolOverride] = {
         "fetch_weather_raw": {
             "output_schema": {
@@ -240,11 +241,11 @@ async def test_jsonpath_missing_source_field_returns_null(
                 "properties": {
                     "temperature": {
                         "type": "number",
-                        "source_field": "raw_sensor_dump.data.temp"
+                        "source_field": "$.raw_sensor_dump.data.temp"
                     },
                     "wind_speed": {
                         "type": "number",
-                        "source_field": "raw_sensor_dump.data.wind"  # Does not exist
+                        "source_field": "$.raw_sensor_dump.data.wind"  # Does not exist
                     }
                 }
             }
@@ -272,8 +273,8 @@ async def test_jsonpath_missing_source_field_returns_null(
         # Present field should be extracted
         assert result.structuredContent["temperature"] == 72.5
 
-        # Missing field should be null (not cause an error)
-        assert result.structuredContent.get("wind_speed") is None
+        # Missing field should be omitted entirely (not null, not error)
+        assert "wind_speed" not in result.structuredContent
 
 
 @pytest.mark.asyncio
@@ -289,11 +290,11 @@ async def test_jsonpath_array_index_access(
                 "properties": {
                     "first_reading": {
                         "type": "number",
-                        "source_field": "readings[0].value"
+                        "source_field": "$.readings[0].value"
                     },
                     "second_reading": {
                         "type": "number",
-                        "source_field": "readings[1].value"
+                        "source_field": "$.readings[1].value"
                     }
                 }
             }
@@ -337,7 +338,7 @@ async def test_jsonpath_array_map_extraction(
                     "doc_ids": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "source_field": "records[*].docId"
+                        "source_field": "$.records[*].docId"
                     }
                 }
             }
@@ -385,7 +386,7 @@ async def test_jsonpath_array_map_nested_extraction(
                     "temperatures": {
                         "type": "array",
                         "items": {"type": "number"},
-                        "source_field": "stations[*].readings.temp"
+                        "source_field": "$.stations[*].readings.temp"
                     }
                 }
             }
@@ -420,7 +421,11 @@ async def test_jsonpath_array_map_with_missing_values(
     server_with_nested_output: Server[object],
     tool_callback: AsyncMock
 ) -> None:
-    """Test array mapping when some elements are missing the target field."""
+    """Test array mapping when some elements are missing the target field.
+
+    JSONPath wildcards naturally filter out missing values, so the result
+    is a compact array with only the found values (not a sparse array with nulls).
+    """
     overrides: dict[str, ToolOverride] = {
         "fetch_weather_raw": {
             "output_schema": {
@@ -429,7 +434,7 @@ async def test_jsonpath_array_map_with_missing_values(
                     "emails": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "source_field": "users[*].email"
+                        "source_field": "$.users[*].email"
                     }
                 }
             }
@@ -455,9 +460,8 @@ async def test_jsonpath_array_map_with_missing_values(
         assert not result.isError
         assert result.structuredContent is not None
 
-        # Missing values should be null in the array (preserving indices)
-        # OR could filter them out - this test asserts null preservation
-        assert result.structuredContent["emails"] == ["alice@example.com", None, "charlie@example.com"]
+        # JSONPath wildcards filter out missing values - result is compact, not sparse
+        assert result.structuredContent["emails"] == ["alice@example.com", "charlie@example.com"]
 
 
 @pytest.mark.asyncio
@@ -480,7 +484,7 @@ async def test_jsonpath_array_to_array_of_objects(
                                 "email": {"type": "string", "source_field": "$.contact.email"}
                             }
                         },
-                        "source_field": "users[*]"
+                        "source_field": "$.users[*]"
                     }
                 }
             }
@@ -527,11 +531,11 @@ async def test_output_schema_advertises_flattened_structure(
                 "properties": {
                     "temperature": {
                         "type": "number",
-                        "source_field": "raw_sensor_dump.data.temp"
+                        "source_field": "$.raw_sensor_dump.data.temp"
                     },
                     "conditions": {
                         "type": "string",
-                        "source_field": "raw_sensor_dump.description"
+                        "source_field": "$.raw_sensor_dump.description"
                     }
                 }
             }
