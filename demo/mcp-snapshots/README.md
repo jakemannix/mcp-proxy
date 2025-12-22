@@ -60,3 +60,18 @@ GITHUB_TOKEN=xxx python extract_tools.py "npx -y @modelcontextprotocol/server-gi
 ```
 
 Most outputSchemas in these servers are simple `{content: string}` wrappers, but `read_media_file` shows a more complex nested structure.
+
+## JSONPath Projection Demo
+
+See `memory-projection-demo.json` and `memory-projection-expected.md` for a demonstration of using `source_field` JSONPath expressions to transform `server-memory` output.
+
+**Example transformations:**
+
+| Tool | Projection | Result |
+|------|------------|--------|
+| `list_entity_names` | `$.entities[*].name` | `["John", "Acme"]` |
+| `list_relation_sources` | `$.relations[*].from` | `["John", "John"]` |
+| `get_entity_summary` | Project to `{name, type}` | Strip observations |
+| `get_connections` | Rename `from`→`subject` | RDF-style triples |
+
+This demonstrates how the gateway can simplify verbose backend responses before sending to agents.
