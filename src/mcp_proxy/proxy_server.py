@@ -10,7 +10,15 @@ import typing as t
 from mcp import server, types
 from mcp.client.session import ClientSession
 
-from .config_loader import ToolOverride
+from typing import TypedDict
+
+class ToolOverride(TypedDict, total=False):
+    """Configuration for overriding tool behavior."""
+    rename: str
+    description: str
+    defaults: dict[str, t.Any]
+    hide_fields: list[str]
+    output_schema: dict[str, t.Any]
 
 logger = logging.getLogger(__name__)
 

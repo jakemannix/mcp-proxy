@@ -9,10 +9,21 @@ from typing import Any, Literal
 
 import uvicorn
 from mcp.client.session import ClientSession
+from mcp.client.sse import sse_client
 from mcp.client.stdio import StdioServerParameters, stdio_client
-from mcp.server import Server as MCPServerSDK  # Renamed to avoid conflict
+from mcp.server import Server as MCPServerSDK
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from mcp.types import (
+    CallToolRequest,
+    CallToolResult,
+    EmbeddedResource,
+    ImageContent,
+    ListToolsRequest,
+    ListToolsResult,
+    TextContent,
+    Tool,
+)
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
@@ -21,8 +32,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import BaseRoute, Mount, Route
 from starlette.types import Receive, Scope, Send
 
-from .config_loader import ToolOverride
-from .proxy_server import create_proxy_server
+from .config_loader import ServerConfig, VirtualTool
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +78,7 @@ async def _handle_status(_: Request) -> Response:
 
 
 def create_single_instance_routes(
-    mcp_server_instance: MCPServerSDK[object],
+    mcp_server_instance: MCPServerSDK,
     *,
     stateless_instance: bool,
 ) -> tuple[list[BaseRoute], StreamableHTTPSessionManager]:  # Return the manager itself
@@ -141,74 +151,109 @@ def create_single_instance_routes(
 
 async def run_mcp_server(
     mcp_settings: MCPServerSettings,
-    default_server_params: StdioServerParameters | None = None,
-    named_server_params: dict[str, StdioServerParameters] | None = None,
-    tool_overrides: dict[str, ToolOverride] | None = None,
+    unique_servers: dict[str, ServerConfig],
+    virtual_tools: list[VirtualTool],
 ) -> None:
-    """Run stdio client(s) and expose an MCP server with multiple possible backends."""
-    if named_server_params is None:
-        named_server_params = {}
-
-    all_routes: list[BaseRoute] = [
-        Route("/status", endpoint=_handle_status),  # Global status endpoint
-    ]
+    """Run the MCP Gateway server."""
+    
     # Use AsyncExitStack to manage lifecycles of multiple components
     async with contextlib.AsyncExitStack() as stack:
         # Manage lifespans of all StreamableHTTPSessionManagers
         @contextlib.asynccontextmanager
         async def combined_lifespan(_app: Starlette) -> AsyncIterator[None]:
             logger.info("Main application lifespan starting...")
-            # All http_session_managers' .run() are already entered into the stack
             yield
             logger.info("Main application lifespan shutting down...")
 
-        # Setup default server if configured
-        if default_server_params:
-            logger.info(
-                "Setting up default server: %s %s",
-                default_server_params.command,
-                " ".join(default_server_params.args),
-            )
-            stdio_streams = await stack.enter_async_context(stdio_client(default_server_params))
-            session = await stack.enter_async_context(ClientSession(*stdio_streams))
-            proxy = await create_proxy_server(session, tool_overrides)
+        # Initialize Backends
+        active_backends: dict[str, ClientSession] = {}
+        
+        for server_id, config in unique_servers.items():
+            try:
+                if config.command:
+                    # Stdio Server
+                    logger.info("Initializing stdio backend: %s %s", config.command, config.args)
+                    server_params = StdioServerParameters(
+                        command=config.command,
+                        args=list(config.args),
+                        env=dict(config.env),
+                        cwd=None
+                    )
+                    stdio_streams = await stack.enter_async_context(stdio_client(server_params))
+                    session = await stack.enter_async_context(ClientSession(*stdio_streams))
+                    await session.initialize()
+                    active_backends[server_id] = session
+                elif config.url:
+                    # Remote Server (SSE)
+                    logger.info("Initializing remote backend: %s", config.url)
+                    # TODO: Support headers/auth if needed
+                    sse_streams = await stack.enter_async_context(sse_client(config.url))
+                    session = await stack.enter_async_context(ClientSession(*sse_streams))
+                    await session.initialize()
+                    active_backends[server_id] = session
+            except Exception:
+                logger.exception("Failed to initialize backend server %s", server_id)
+                # We continue, but tools using this backend will fail
+        
+        # Create Aggregator Server
+        gateway = MCPServerSDK("mcp-gateway")
 
-            instance_routes, http_manager = create_single_instance_routes(
-                proxy,
-                stateless_instance=mcp_settings.stateless,
-            )
-            await stack.enter_async_context(http_manager.run())  # Manage lifespan by calling run()
-            all_routes.extend(instance_routes)
-            _global_status["server_instances"]["default"] = "configured"
+        @gateway.list_tools()
+        async def list_tools() -> list[Tool]:
+            tools = []
+            for vt in virtual_tools:
+                tools.append(Tool(
+                    name=vt.name,
+                    description=vt.description or "",
+                    inputSchema=vt.input_schema
+                ))
+            return tools
 
-        # Setup named servers
-        for name, params in named_server_params.items():
-            logger.info(
-                "Setting up named server '%s': %s %s",
-                name,
-                params.command,
-                " ".join(params.args),
-            )
-            stdio_streams_named = await stack.enter_async_context(stdio_client(params))
-            session_named = await stack.enter_async_context(ClientSession(*stdio_streams_named))
-            proxy_named = await create_proxy_server(session_named, tool_overrides)
+        @gateway.call_tool()
+        async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageContent | EmbeddedResource]:
+            # Find the tool
+            tool = next((t for t in virtual_tools if t.name == name), None)
+            if not tool:
+                raise ValueError(f"Tool not found: {name}")
+            
+            # Get backend
+            backend = active_backends.get(tool.server_id)
+            if not backend:
+                raise RuntimeError(f"Backend for tool {name} is not available")
+            
+            # Inject defaults
+            final_args = arguments.copy()
+            if tool.defaults:
+                for k, v in tool.defaults.items():
+                    if k not in final_args:
+                        final_args[k] = v
+            
+            # Determine target name
+            target_name = tool.original_name or tool.name
+            # If original_name is set (from source), use it. 
+            # If not, use the tool's name (direct mapping).
+            # Wait, if source was used, original_name is the source tool's name.
+            # If source was NOT used, original_name is None, so we use tool.name.
+            # But wait, if I renamed a tool in the old override system, I need to map it.
+            # In the new registry, 'source' IS the original name.
+            # So if I have: name="remember_entities", source="create_entities" -> call "create_entities"
+            # If I have: name="read_file", source=None -> call "read_file"
+            
+            logger.info("Routing call %s -> %s (backend: %s)", name, target_name, tool.server_id)
+            
+            result = await backend.call_tool(target_name, final_args)
+            return result.content
 
-            instance_routes_named, http_manager_named = create_single_instance_routes(
-                proxy_named,
-                stateless_instance=mcp_settings.stateless,
-            )
-            await stack.enter_async_context(
-                http_manager_named.run(),
-            )  # Manage lifespan by calling run()
+        # Create Routes
+        instance_routes, http_manager = create_single_instance_routes(
+            gateway,
+            stateless_instance=mcp_settings.stateless,
+        )
+        await stack.enter_async_context(http_manager.run())
 
-            # Mount these routes under /servers/<name>/
-            server_mount = Mount(f"/servers/{name}", routes=instance_routes_named)
-            all_routes.append(server_mount)
-            _global_status["server_instances"][name] = "configured"
-
-        if not default_server_params and not named_server_params:
-            logger.error("No servers configured to run.")
-            return
+        all_routes = [
+            Route("/status", endpoint=_handle_status),
+        ] + instance_routes
 
         middleware: list[Middleware] = []
         if mcp_settings.allow_origins:
@@ -228,8 +273,6 @@ async def run_mcp_server(
             lifespan=combined_lifespan,
         )
 
-        starlette_app.router.redirect_slashes = False
-
         config = uvicorn.Config(
             starlette_app,
             host=mcp_settings.bind_host,
@@ -238,27 +281,6 @@ async def run_mcp_server(
         )
         http_server = uvicorn.Server(config)
 
-        # Print out the SSE URLs for all configured servers
-        base_url = f"http://{mcp_settings.bind_host}:{mcp_settings.port}"
-        sse_urls = []
-
-        # Add default server if configured
-        if default_server_params:
-            sse_urls.append(f"{base_url}/sse")
-
-        # Add named servers
-        sse_urls.extend([f"{base_url}/servers/{name}/sse" for name in named_server_params])
-
-        # Display the SSE URLs prominently
-        if sse_urls:
-            # Using print directly for user visibility, with noqa to ignore linter warnings
-            logger.info("Serving MCP Servers via SSE:")
-            for url in sse_urls:
-                logger.info("  - %s", url)
-
-        logger.debug(
-            "Serving incoming MCP requests on %s:%s",
-            mcp_settings.bind_host,
-            mcp_settings.port,
-        )
+        logger.info("Serving Unified MCP Gateway on http://%s:%s/sse", mcp_settings.bind_host, mcp_settings.port)
         await http_server.serve()
+
