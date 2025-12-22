@@ -1,4 +1,4 @@
-"""TDD tests for JSONPath-based output schema field mapping.
+"""Tests for JSONPath-based output schema field mapping.
 
 These tests define the target behavior for extracting nested fields from
 tool outputs using JSONPath-like expressions in the `source_field` property.
@@ -321,6 +321,196 @@ async def test_jsonpath_array_index_access(
 
         assert result.structuredContent["first_reading"] == 100
         assert result.structuredContent["second_reading"] == 105
+
+
+@pytest.mark.asyncio
+async def test_jsonpath_array_map_extraction(
+    server_with_nested_output: Server[object],
+    tool_callback: AsyncMock
+) -> None:
+    """Test extracting a field from all array elements using wildcard notation."""
+    overrides: dict[str, ToolOverride] = {
+        "fetch_weather_raw": {
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "doc_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "source_field": "records[*].docId"
+                    }
+                }
+            }
+        }
+    }
+
+    tool_callback.return_value = types.CallToolResult(
+        content=[types.TextContent(type="text", text="Records")],
+        structuredContent={
+            "records": [
+                {"docId": "abc123", "title": "First Doc"},
+                {"docId": "def456", "title": "Second Doc"},
+                {"docId": "ghi789", "title": "Third Doc"}
+            ]
+        }
+    )
+
+    async with proxy_with_overrides_context(server_with_nested_output, overrides) as session:
+        await session.initialize()
+
+        result = await session.call_tool("fetch_weather_raw", {"city": "Seattle"})
+
+        assert not result.isError
+        assert result.structuredContent is not None
+
+        # Should have extracted docId from each record into a flat array
+        assert "doc_ids" in result.structuredContent
+        assert result.structuredContent["doc_ids"] == ["abc123", "def456", "ghi789"]
+
+        # Original nested structure should NOT be present
+        assert "records" not in result.structuredContent
+
+
+@pytest.mark.asyncio
+async def test_jsonpath_array_map_nested_extraction(
+    server_with_nested_output: Server[object],
+    tool_callback: AsyncMock
+) -> None:
+    """Test extracting nested fields from all array elements."""
+    overrides: dict[str, ToolOverride] = {
+        "fetch_weather_raw": {
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "temperatures": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "source_field": "stations[*].readings.temp"
+                    }
+                }
+            }
+        }
+    }
+
+    tool_callback.return_value = types.CallToolResult(
+        content=[types.TextContent(type="text", text="Stations")],
+        structuredContent={
+            "stations": [
+                {"id": "A", "readings": {"temp": 72.5, "humidity": 45}},
+                {"id": "B", "readings": {"temp": 68.0, "humidity": 52}},
+                {"id": "C", "readings": {"temp": 75.2, "humidity": 38}}
+            ]
+        }
+    )
+
+    async with proxy_with_overrides_context(server_with_nested_output, overrides) as session:
+        await session.initialize()
+
+        result = await session.call_tool("fetch_weather_raw", {"city": "Seattle"})
+
+        assert not result.isError
+        assert result.structuredContent is not None
+
+        # Should have extracted temp from each station's readings
+        assert result.structuredContent["temperatures"] == [72.5, 68.0, 75.2]
+
+
+@pytest.mark.asyncio
+async def test_jsonpath_array_map_with_missing_values(
+    server_with_nested_output: Server[object],
+    tool_callback: AsyncMock
+) -> None:
+    """Test array mapping when some elements are missing the target field."""
+    overrides: dict[str, ToolOverride] = {
+        "fetch_weather_raw": {
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "emails": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "source_field": "users[*].email"
+                    }
+                }
+            }
+        }
+    }
+
+    tool_callback.return_value = types.CallToolResult(
+        content=[types.TextContent(type="text", text="Users")],
+        structuredContent={
+            "users": [
+                {"name": "Alice", "email": "alice@example.com"},
+                {"name": "Bob"},  # No email field
+                {"name": "Charlie", "email": "charlie@example.com"}
+            ]
+        }
+    )
+
+    async with proxy_with_overrides_context(server_with_nested_output, overrides) as session:
+        await session.initialize()
+
+        result = await session.call_tool("fetch_weather_raw", {"city": "Seattle"})
+
+        assert not result.isError
+        assert result.structuredContent is not None
+
+        # Missing values should be null in the array (preserving indices)
+        # OR could filter them out - this test asserts null preservation
+        assert result.structuredContent["emails"] == ["alice@example.com", None, "charlie@example.com"]
+
+
+@pytest.mark.asyncio
+async def test_jsonpath_array_to_array_of_objects(
+    server_with_nested_output: Server[object],
+    tool_callback: AsyncMock
+) -> None:
+    """Test projecting array elements to a subset of fields (array of objects)."""
+    overrides: dict[str, ToolOverride] = {
+        "fetch_weather_raw": {
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "contacts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string", "source_field": "$.name"},
+                                "email": {"type": "string", "source_field": "$.contact.email"}
+                            }
+                        },
+                        "source_field": "users[*]"
+                    }
+                }
+            }
+        }
+    }
+
+    tool_callback.return_value = types.CallToolResult(
+        content=[types.TextContent(type="text", text="Users")],
+        structuredContent={
+            "users": [
+                {"name": "Alice", "contact": {"email": "alice@example.com", "phone": "555-1234"}, "internal_id": "u1"},
+                {"name": "Bob", "contact": {"email": "bob@example.com", "phone": "555-5678"}, "internal_id": "u2"}
+            ]
+        }
+    )
+
+    async with proxy_with_overrides_context(server_with_nested_output, overrides) as session:
+        await session.initialize()
+
+        result = await session.call_tool("fetch_weather_raw", {"city": "Seattle"})
+
+        assert not result.isError
+        assert result.structuredContent is not None
+
+        # Should have projected each user to just name + email
+        expected = [
+            {"name": "Alice", "email": "alice@example.com"},
+            {"name": "Bob", "email": "bob@example.com"}
+        ]
+        assert result.structuredContent["contacts"] == expected
 
 
 @pytest.mark.asyncio
