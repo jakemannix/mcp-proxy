@@ -7,7 +7,7 @@ import pytest
 from mcp import types
 from mcp.server import Server
 
-from mcp_proxy.config_loader import ToolOverride
+from mcp_proxy.proxy_server import ToolOverride
 from tests.test_sidecar_overrides import proxy_with_overrides_context, server
 
 

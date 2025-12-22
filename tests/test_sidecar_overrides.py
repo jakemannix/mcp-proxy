@@ -11,7 +11,7 @@ from mcp.client.session import ClientSession
 from mcp.server import Server
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from mcp_proxy.config_loader import ToolOverride
+from mcp_proxy.proxy_server import ToolOverride
 from mcp_proxy.proxy_server import create_proxy_server
 
 # Direct server connection
