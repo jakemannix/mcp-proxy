@@ -1,0 +1,231 @@
+{
+  "server": "memory-server",
+  "version": "0.6.3",
+  "tools": {
+    "create_entities": {
+      "description": "Create multiple new entities in the knowledge graph",
+      "has_output_schema": true,
+      "example_input": {
+        "entities": [
+          {
+            "name": "John_Smith",
+            "entityType": "person",
+            "observations": ["Works at Acme Corp", "Lives in San Francisco", "Software engineer"]
+          },
+          {
+            "name": "Acme_Corp",
+            "entityType": "organization",
+            "observations": ["Technology company", "Founded in 2010", "Headquarters in SF"]
+          }
+        ]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Created 2 entities"}
+        ],
+        "structuredContent": {
+          "entities": [
+            {
+              "name": "John_Smith",
+              "entityType": "person",
+              "observations": ["Works at Acme Corp", "Lives in San Francisco", "Software engineer"]
+            },
+            {
+              "name": "Acme_Corp",
+              "entityType": "organization",
+              "observations": ["Technology company", "Founded in 2010", "Headquarters in SF"]
+            }
+          ]
+        }
+      }
+    },
+    "create_relations": {
+      "description": "Create multiple new relations between entities in the knowledge graph",
+      "has_output_schema": true,
+      "example_input": {
+        "relations": [
+          {"from": "John_Smith", "to": "Acme_Corp", "relationType": "works_at"},
+          {"from": "John_Smith", "to": "San_Francisco", "relationType": "lives_in"}
+        ]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Created 2 relations"}
+        ],
+        "structuredContent": {
+          "relations": [
+            {"from": "John_Smith", "to": "Acme_Corp", "relationType": "works_at"},
+            {"from": "John_Smith", "to": "San_Francisco", "relationType": "lives_in"}
+          ]
+        }
+      }
+    },
+    "add_observations": {
+      "description": "Add new observations to existing entities in the knowledge graph",
+      "has_output_schema": true,
+      "example_input": {
+        "observations": [
+          {
+            "entityName": "John_Smith",
+            "contents": ["Promoted to senior engineer in 2024", "Learning Rust"]
+          }
+        ]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Added observations to 1 entity"}
+        ],
+        "structuredContent": {
+          "results": [
+            {
+              "entityName": "John_Smith",
+              "addedObservations": ["Promoted to senior engineer in 2024", "Learning Rust"]
+            }
+          ]
+        }
+      }
+    },
+    "delete_entities": {
+      "description": "Delete multiple entities and their associated relations from the knowledge graph",
+      "has_output_schema": true,
+      "example_input": {
+        "entityNames": ["Old_Project", "Deprecated_Tool"]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Deleted 2 entities"}
+        ],
+        "structuredContent": {
+          "success": true,
+          "message": "Deleted 2 entities and their associated relations"
+        }
+      }
+    },
+    "delete_observations": {
+      "description": "Delete specific observations from entities in the knowledge graph",
+      "has_output_schema": true,
+      "example_input": {
+        "deletions": [
+          {
+            "entityName": "John_Smith",
+            "observations": ["Outdated info about previous role"]
+          }
+        ]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Deleted observations"}
+        ],
+        "structuredContent": {
+          "success": true,
+          "message": "Deleted 1 observation from John_Smith"
+        }
+      }
+    },
+    "delete_relations": {
+      "description": "Delete multiple relations from the knowledge graph",
+      "has_output_schema": true,
+      "example_input": {
+        "relations": [
+          {"from": "John_Smith", "to": "Old_Company", "relationType": "works_at"}
+        ]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Deleted 1 relation"}
+        ],
+        "structuredContent": {
+          "success": true,
+          "message": "Deleted 1 relation"
+        }
+      }
+    },
+    "read_graph": {
+      "description": "Read the entire knowledge graph",
+      "has_output_schema": true,
+      "example_input": {},
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Knowledge graph with 3 entities and 2 relations"}
+        ],
+        "structuredContent": {
+          "entities": [
+            {
+              "name": "John_Smith",
+              "entityType": "person",
+              "observations": ["Works at Acme Corp", "Lives in San Francisco", "Software engineer", "Promoted to senior engineer in 2024"]
+            },
+            {
+              "name": "Acme_Corp",
+              "entityType": "organization",
+              "observations": ["Technology company", "Founded in 2010", "Headquarters in SF"]
+            },
+            {
+              "name": "San_Francisco",
+              "entityType": "location",
+              "observations": ["City in California", "Tech hub"]
+            }
+          ],
+          "relations": [
+            {"from": "John_Smith", "to": "Acme_Corp", "relationType": "works_at"},
+            {"from": "John_Smith", "to": "San_Francisco", "relationType": "lives_in"}
+          ]
+        }
+      }
+    },
+    "search_nodes": {
+      "description": "Search for nodes in the knowledge graph based on a query",
+      "has_output_schema": true,
+      "example_input": {
+        "query": "engineer"
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Found 1 matching entity"}
+        ],
+        "structuredContent": {
+          "entities": [
+            {
+              "name": "John_Smith",
+              "entityType": "person",
+              "observations": ["Works at Acme Corp", "Lives in San Francisco", "Software engineer", "Promoted to senior engineer in 2024"]
+            }
+          ],
+          "relations": [
+            {"from": "John_Smith", "to": "Acme_Corp", "relationType": "works_at"},
+            {"from": "John_Smith", "to": "San_Francisco", "relationType": "lives_in"}
+          ]
+        }
+      }
+    },
+    "open_nodes": {
+      "description": "Open specific nodes in the knowledge graph by their names",
+      "has_output_schema": true,
+      "example_input": {
+        "names": ["John_Smith", "Acme_Corp"]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Opened 2 nodes"}
+        ],
+        "structuredContent": {
+          "entities": [
+            {
+              "name": "John_Smith",
+              "entityType": "person",
+              "observations": ["Works at Acme Corp", "Lives in San Francisco", "Software engineer"]
+            },
+            {
+              "name": "Acme_Corp",
+              "entityType": "organization",
+              "observations": ["Technology company", "Founded in 2010", "Headquarters in SF"]
+            }
+          ],
+          "relations": [
+            {"from": "John_Smith", "to": "Acme_Corp", "relationType": "works_at"}
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "server": "example-servers/puppeteer",
+  "version": "0.1.0",
+  "tools": {
+    "puppeteer_navigate": {
+      "description": "Navigate to a URL",
+      "has_output_schema": false,
+      "example_input": {
+        "url": "https://example.com"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Navigated to https://example.com\n\nPage title: Example Domain\nURL: https://example.com/\nStatus: 200"
+          }
+        ]
+      }
+    },
+    "puppeteer_screenshot": {
+      "description": "Take a screenshot of the current page or a specific element",
+      "has_output_schema": false,
+      "example_input": {
+        "name": "homepage",
+        "width": 1280,
+        "height": 720
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "image",
+            "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+            "mimeType": "image/png"
+          }
+        ]
+      }
+    },
+    "puppeteer_click": {
+      "description": "Click an element on the page",
+      "has_output_schema": false,
+      "example_input": {
+        "selector": "button.submit"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Clicked element: button.submit"
+          }
+        ]
+      }
+    },
+    "puppeteer_fill": {
+      "description": "Fill out an input field",
+      "has_output_schema": false,
+      "example_input": {
+        "selector": "input[name='email']",
+        "value": "user@example.com"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Filled input[name='email'] with value"
+          }
+        ]
+      }
+    },
+    "puppeteer_select": {
+      "description": "Select an element on the page with Select tag",
+      "has_output_schema": false,
+      "example_input": {
+        "selector": "select#country",
+        "value": "US"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Selected 'US' in select#country"
+          }
+        ]
+      }
+    },
+    "puppeteer_hover": {
+      "description": "Hover an element on the page",
+      "has_output_schema": false,
+      "example_input": {
+        "selector": "nav.menu > li:first-child"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Hovered over element: nav.menu > li:first-child"
+          }
+        ]
+      }
+    },
+    "puppeteer_evaluate": {
+      "description": "Execute JavaScript in the browser console",
+      "has_output_schema": false,
+      "example_input": {
+        "script": "document.querySelectorAll('a').length"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Evaluation result: 15"
+          }
+        ]
+      }
+    }
+  }
+}
