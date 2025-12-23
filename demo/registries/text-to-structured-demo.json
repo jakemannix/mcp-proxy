@@ -11,14 +11,14 @@
   "tools": [
     {
       "$comment": "=== RAW TIME SERVER (text-only output) ===",
-      "name": "time_raw",
-      "description": "Raw time server output - returns JSON embedded in text content",
+      "name": "get_current_time",
+      "description": "Raw time server - returns JSON embedded in text",
       "inputSchema": {
         "type": "object",
         "properties": {
           "timezone": {
             "type": "string",
-            "description": "IANA timezone (e.g., 'America/New_York')"
+            "description": "IANA timezone (e.g., 'America/New_York', 'Asia/Tokyo')"
           }
         },
         "required": ["timezone"]
@@ -27,9 +27,9 @@
     },
     {
       "$comment": "=== STRUCTURED TIME (extracts JSON from text) ===",
-      "name": "get_time",
-      "source": "time_raw",
-      "description": "Get current time with structured output (auto-extracted from text)",
+      "name": "get_time_structured",
+      "source": "get_current_time",
+      "description": "Get current time with structured output (auto-extracted from text JSON)",
       "outputSchema": {
         "type": "object",
         "properties": {
@@ -42,9 +42,9 @@
     },
     {
       "$comment": "=== SIMPLIFIED TIME (projection on extracted JSON) ===",
-      "name": "what_time",
-      "source": "time_raw",
-      "description": "Simplified time output - just timezone and day",
+      "name": "what_time_is_it",
+      "source": "get_current_time",
+      "description": "Simplified time - extracts and projects to just timezone and day",
       "outputSchema": {
         "type": "object",
         "properties": {
@@ -55,14 +55,14 @@
     },
     {
       "$comment": "=== RAW TIME CONVERSION ===",
-      "name": "convert_time_raw",
+      "name": "convert_time",
       "description": "Raw time conversion - returns nested JSON in text",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "source_timezone": {"type": "string"},
+          "source_timezone": {"type": "string", "description": "Source IANA timezone"},
           "time": {"type": "string", "description": "Time in HH:MM format"},
-          "target_timezone": {"type": "string"}
+          "target_timezone": {"type": "string", "description": "Target IANA timezone"}
         },
         "required": ["source_timezone", "time", "target_timezone"]
       },
@@ -70,9 +70,9 @@
     },
     {
       "$comment": "=== FLATTENED TIME CONVERSION ===",
-      "name": "convert_timezone",
-      "source": "convert_time_raw",
-      "description": "Simplified timezone conversion with flattened structure",
+      "name": "convert_timezone_flat",
+      "source": "convert_time",
+      "description": "Timezone conversion with flattened output (extracts nested JSON)",
       "outputSchema": {
         "type": "object",
         "properties": {
@@ -85,24 +85,24 @@
       }
     },
     {
-      "$comment": "=== FETCH SERVER WITH API RESPONSE EXTRACTION ===",
-      "name": "fetch_raw",
-      "description": "Raw fetch - can return JSON APIs with text prefix",
+      "$comment": "=== FETCH SERVER ===",
+      "name": "fetch",
+      "description": "Raw fetch - returns content (may include JSON for API responses)",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "url": {"type": "string"},
-          "max_length": {"type": "integer", "default": 10000}
+          "url": {"type": "string", "description": "URL to fetch"},
+          "max_length": {"type": "integer", "description": "Max content length"}
         },
         "required": ["url"]
       },
       "server": {"command": "uvx", "args": ["mcp-server-fetch"]}
     },
     {
-      "$comment": "=== GITHUB REPO INFO (extract from fetch) ===",
+      "$comment": "=== GITHUB REPO INFO (extract JSON from API response) ===",
       "name": "get_github_repo",
-      "source": "fetch_raw",
-      "description": "Fetch GitHub repo info with structured output",
+      "source": "fetch",
+      "description": "Fetch GitHub repo info - extracts JSON from API response",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -129,4 +129,3 @@
     }
   ]
 }
-

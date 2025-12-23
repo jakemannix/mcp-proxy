@@ -831,3 +831,80 @@ html, body {
         display: none;
     }
 }
+
+/* ============================================
+   Text-to-Structured Extraction Styles
+   ============================================ */
+.badge-text-extract {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(34, 211, 238, 0.2));
+    color: var(--accent-success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.header-badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-left: var(--space-md);
+}
+
+.header-badge.badge-text-extract {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(34, 211, 238, 0.15));
+    color: var(--accent-success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.extraction-box {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(34, 211, 238, 0.05));
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+}
+
+.extraction-desc {
+    margin: 0 0 var(--space-md) 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.extraction-flow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+}
+
+.step-num {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-success);
+    color: var(--bg-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.step-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.step-arrow {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}

@@ -12,9 +12,15 @@ def ToolCard(tool: dict, selected: bool = False):
     has_projection = "outputSchema" in tool
     defaults = tool.get("defaults", {})
     has_defaults = bool(defaults)
+    server = tool.get("server")
+    
+    # Detect if this is a virtual tool that structures text output
+    is_text_to_structured = source and has_projection and not server
 
     badges = []
-    if has_projection:
+    if is_text_to_structured:
+        badges.append(Span("text→json", cls="badge badge-text-extract"))
+    elif has_projection:
         badges.append(Span("projection", cls="badge badge-projection"))
     if has_defaults:
         badges.append(Span(f"{len(defaults)} hidden", cls="badge badge-hidden"))
@@ -43,21 +49,78 @@ def ToolDetail(tool: dict):
     input_schema = tool.get("inputSchema", {})
     output_schema = tool.get("outputSchema")
     defaults = tool.get("defaults", {})
+    server = tool.get("server")
+    
+    # Detect if this is a virtual tool that structures text output
+    is_text_to_structured = source and output_schema and not server
 
     sections = []
 
     # Header section
+    header_badges = []
+    if is_text_to_structured:
+        header_badges.append(Span("Text → Structured JSON", cls="header-badge badge-text-extract"))
+    
     sections.append(
         Div(
             Div(
                 UkIcon("terminal", height=20, width=20, cls="detail-icon"),
                 H2(name, cls="detail-title"),
+                *header_badges,
                 cls="detail-header-row"
             ),
             Span(f"Source: {source}", cls="detail-source") if source else None,
             cls="detail-header"
         )
     )
+    
+    # Text-to-Structured explanation
+    if is_text_to_structured:
+        sections.append(
+            Div(
+                Div(
+                    UkIcon("zap", height=14, width=14),
+                    Span("JSON Extraction", cls="label-text"),
+                    cls="detail-label"
+                ),
+                Div(
+                    P(
+                        f"This virtual tool extracts JSON from the text output of ",
+                        Strong(source),
+                        " and structures it according to the output schema.",
+                        cls="extraction-desc"
+                    ),
+                    Div(
+                        Div(
+                            Span("1", cls="step-num"),
+                            Span(f"{source} returns JSON in text", cls="step-text"),
+                            cls="step"
+                        ),
+                        Div(
+                            UkIcon("arrow-right", height=12, width=12),
+                            cls="step-arrow"
+                        ),
+                        Div(
+                            Span("2", cls="step-num"),
+                            Span("Gateway extracts JSON", cls="step-text"),
+                            cls="step"
+                        ),
+                        Div(
+                            UkIcon("arrow-right", height=12, width=12),
+                            cls="step-arrow"
+                        ),
+                        Div(
+                            Span("3", cls="step-num"),
+                            Span("Projects to output schema", cls="step-text"),
+                            cls="step"
+                        ),
+                        cls="extraction-flow"
+                    ),
+                    cls="extraction-box"
+                ),
+                cls="detail-section"
+            )
+        )
 
     # Description section
     sections.append(
