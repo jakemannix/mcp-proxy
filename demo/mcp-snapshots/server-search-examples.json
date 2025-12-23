@@ -1,0 +1,39 @@
+{
+  "server": "brave-search-server",
+  "version": "0.1.0",
+  "tools": {
+    "brave_web_search": {
+      "description": "Search the web using Brave Search API",
+      "has_output_schema": false,
+      "example_input": {
+        "query": "model context protocol",
+        "count": 3
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Search results for 'model context protocol' (3 results):\n\n1. **Model Context Protocol | Anthropic**\n   https://www.anthropic.com/news/model-context-protocol\n   The Model Context Protocol (MCP) is an open standard that enables developers to build secure, two-way connections between their data sources and AI-powered tools.\n   \n2. **Model Context Protocol - GitHub**\n   https://github.com/modelcontextprotocol\n   Official GitHub organization for the Model Context Protocol, an open protocol for connecting AI assistants to data sources.\n   \n3. **Getting Started with MCP | Documentation**\n   https://modelcontextprotocol.io/docs/getting-started\n   Learn how to integrate the Model Context Protocol into your applications with our comprehensive documentation and examples."
+          }
+        ]
+      }
+    },
+    "brave_local_search": {
+      "description": "Search for local businesses and places",
+      "has_output_schema": false,
+      "example_input": {
+        "query": "coffee shops",
+        "location": "San Francisco, CA"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Local results for 'coffee shops' near San Francisco, CA:\n\n📍 Blue Bottle Coffee\n   Address: 66 Mint St, San Francisco, CA 94103\n   Rating: ⭐ 4.5 (1,234 reviews)\n   Distance: 0.3 miles\n   Status: Open now\n\n📍 Sightglass Coffee\n   Address: 270 7th St, San Francisco, CA 94103\n   Rating: ⭐ 4.3 (892 reviews)\n   Distance: 0.5 miles\n   Status: Open now\n\n📍 Ritual Coffee Roasters\n   Address: 1026 Valencia St, San Francisco, CA 94110\n   Rating: ⭐ 4.4 (756 reviews)\n   Distance: 1.2 miles\n   Status: Open now"
+          }
+        ]
+      }
+    }
+  }
+}
+

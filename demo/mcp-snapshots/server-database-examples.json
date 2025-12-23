@@ -1,0 +1,50 @@
+{
+  "server": "database-server",
+  "version": "1.0.0",
+  "tools": {
+    "query": {
+      "description": "Execute a SQL query and return results",
+      "has_output_schema": false,
+      "example_input": {
+        "sql": "SELECT name, email, created_at FROM users WHERE active = true LIMIT 3"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Query executed successfully. 3 rows returned.\n\n| name          | email                | created_at          |\n|---------------|----------------------|---------------------|\n| Alice Johnson | alice@example.com    | 2024-01-15 10:23:45 |\n| Bob Smith     | bob@example.com      | 2024-02-20 14:30:12 |\n| Carol White   | carol@example.com    | 2024-03-05 09:15:33 |\n\nQuery time: 42ms"
+          }
+        ]
+      }
+    },
+    "list_tables": {
+      "description": "List all tables in the database",
+      "has_output_schema": false,
+      "example_input": {},
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Tables in database:\n\n1. users (5,234 rows)\n2. orders (12,456 rows)\n3. products (892 rows)\n4. categories (45 rows)\n5. reviews (3,421 rows)\n\nTotal: 5 tables"
+          }
+        ]
+      }
+    },
+    "describe_table": {
+      "description": "Get the schema/structure of a table",
+      "has_output_schema": false,
+      "example_input": {
+        "table_name": "users"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Table: users\n\nColumns:\n  id           INTEGER     PRIMARY KEY, AUTO_INCREMENT\n  name         VARCHAR(255) NOT NULL\n  email        VARCHAR(255) NOT NULL, UNIQUE\n  password     VARCHAR(255) NOT NULL\n  active       BOOLEAN     DEFAULT true\n  created_at   TIMESTAMP   DEFAULT CURRENT_TIMESTAMP\n  updated_at   TIMESTAMP   DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP\n\nIndexes:\n  PRIMARY KEY (id)\n  UNIQUE KEY email_idx (email)\n  INDEX active_idx (active)\n\nTotal rows: 5,234"
+          }
+        ]
+      }
+    }
+  }
+}
+

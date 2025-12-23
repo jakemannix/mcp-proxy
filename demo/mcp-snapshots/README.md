@@ -1,6 +1,21 @@
 # MCP Server Tool Snapshots
 
-Captured `tools/list` responses from various MCP servers to understand real-world schema usage.
+Captured `tools/list` responses and example outputs from various MCP servers to understand real-world schema usage and output patterns.
+
+## 📊 Survey Summary
+
+**See [SURVEY-SUMMARY.md](SURVEY-SUMMARY.md) for complete findings and design recommendations.**
+
+Quick stats from surveying 10 MCP servers:
+- **20%** use `outputSchema` (only reference implementations)
+- **80%** pack structured data into text fields
+- **6 clear patterns** identified (JSON-in-text, markdown lists, key-value, etc.)
+- **90%+ coverage** achievable with 3-4 declarative parsers (no UDF needed!)
+
+Full analysis:
+- 📋 [SURVEY-SUMMARY.md](SURVEY-SUMMARY.md) - Executive summary and key findings
+- 📊 [output-pattern-analysis.md](output-pattern-analysis.md) - Detailed pattern taxonomy
+- 🏗️ [text-extraction-design.md](text-extraction-design.md) - Implementation plan
 
 ## OutputSchema Adoption
 
@@ -8,11 +23,18 @@ Captured `tools/list` responses from various MCP servers to understand real-worl
 |--------|-------|-------------------|-------|
 | server-filesystem | 14 | 14 (100%) | Official MCP reference server |
 | server-memory | 9 | 9 (100%) | Official MCP reference server |
-| server-github | 26 | 0 (0%) | Official MCP reference server |
-| server-puppeteer | 7 | 0 (0%) | Official MCP reference server |
-| mcp-server-fetch | 1 | 0 (0%) | Community server |
+| server-github | 26 | 0 (0%) | Returns markdown formatted lists |
+| server-puppeteer | 7 | 0 (0%) | Returns simple status messages |
+| mcp-server-fetch | 1 | 0 (0%) | Returns markdown content |
+| server-time | 2 | 0 (0%) | Returns JSON embedded in text ⭐ |
+| server-weather | 2 | 0 (0%) | Returns formatted key-value text ⭐ |
+| server-database | 3 | 0 (0%) | Returns markdown tables ⭐ |
+| server-search | 2 | 0 (0%) | Returns numbered markdown lists ⭐ |
+| server-slack | 3 | 0 (0%) | Returns message blocks ⭐ |
 
-**Key finding:** Only the filesystem and memory servers from the official `@modelcontextprotocol` org use `outputSchema`. The pattern seems to be that servers returning structured data (file contents, entities) define schemas, while servers wrapping external APIs (GitHub, Puppeteer) do not.
+⭐ = Representative example created for survey (not actual running server capture)
+
+**Key finding:** Only the filesystem and memory servers from the official `@modelcontextprotocol` org use `outputSchema`. Servers wrapping external APIs (GitHub, Puppeteer) or providing formatted data (weather, search) pack structured data into text fields using consistent patterns.
 
 ## Servers Requiring Config
 

@@ -1,0 +1,38 @@
+{
+  "server": "weather-server",
+  "version": "1.0.0",
+  "tools": {
+    "get_weather": {
+      "description": "Get current weather for a location",
+      "has_output_schema": false,
+      "example_input": {
+        "location": "San Francisco, CA"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Weather for San Francisco, CA:\n\nCurrent Conditions:\n  Temperature: 58°F (14°C)\n  Feels like: 55°F (13°C)\n  Conditions: Partly Cloudy\n  Humidity: 72%\n  Wind: 12 mph NW\n  Pressure: 30.12 inHg\n  Visibility: 10 miles\n\nLast updated: 2025-12-23 09:45 AM PST"
+          }
+        ]
+      }
+    },
+    "get_forecast": {
+      "description": "Get weather forecast for the next several days",
+      "has_output_schema": false,
+      "example_input": {
+        "location": "New York, NY",
+        "days": 3
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "3-Day Forecast for New York, NY:\n\n📅 Tuesday, Dec 23\n   High: 42°F | Low: 35°F\n   Conditions: Cloudy\n   Precipitation: 10%\n\n📅 Wednesday, Dec 24\n   High: 38°F | Low: 30°F\n   Conditions: Light Snow\n   Precipitation: 60%\n\n📅 Thursday, Dec 25\n   High: 35°F | Low: 28°F\n   Conditions: Mostly Sunny\n   Precipitation: 5%"
+          }
+        ]
+      }
+    }
+  }
+}
+

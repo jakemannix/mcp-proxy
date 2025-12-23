@@ -1,0 +1,39 @@
+{
+  "server": "mcp-time",
+  "version": "1.25.0",
+  "tools": {
+    "get_current_time": {
+      "description": "Get current time in a specific timezones",
+      "has_output_schema": false,
+      "example_input": {
+        "timezone": "America/New_York"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"timezone\": \"America/New_York\",\n  \"datetime\": \"2025-12-23T09:46:14-05:00\",\n  \"day_of_week\": \"Tuesday\",\n  \"is_dst\": false\n}"
+          }
+        ]
+      }
+    },
+    "convert_time": {
+      "description": "Convert time between timezones",
+      "has_output_schema": false,
+      "example_input": {
+        "source_timezone": "America/New_York",
+        "time": "14:30",
+        "target_timezone": "Asia/Tokyo"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"source\": {\n    \"timezone\": \"America/New_York\",\n    \"datetime\": \"2025-12-23T14:30:00-05:00\",\n    \"day_of_week\": \"Tuesday\",\n    \"is_dst\": false\n  },\n  \"target\": {\n    \"timezone\": \"Asia/Tokyo\",\n    \"datetime\": \"2025-12-24T04:30:00+09:00\",\n    \"day_of_week\": \"Wednesday\",\n    \"is_dst\": false\n  },\n  \"time_difference\": \"+14.0h\"\n}"
+          }
+        ]
+      }
+    }
+  }
+}
+
