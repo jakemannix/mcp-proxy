@@ -4,6 +4,7 @@ This module provides functions for:
 1. Extracting values from nested data using standard JSONPath syntax
 2. Projecting structured content according to output schema definitions
 3. Stripping internal source_field metadata before advertising schemas to LLMs
+4. Detecting and extracting JSON embedded in text content
 
 Uses the jsonpath-ng library for JSONPath parsing and evaluation.
 """
@@ -13,6 +14,8 @@ import typing as t
 
 from jsonpath_ng import parse as parse_jsonpath
 from jsonpath_ng.exceptions import JsonPathParserError
+
+from mcp_proxy.json_detector import extract_json_from_tool_result
 
 
 def extract_value(data: t.Any, path: str) -> t.Any:  # noqa: ANN401
@@ -191,3 +194,99 @@ def _strip_source_fields_recursive(obj: t.Any) -> None:  # noqa: ANN401
         elif isinstance(value, list):
             for item in value:
                 _strip_source_fields_recursive(item)
+
+
+def get_structured_content(
+    tool_result: dict[str, t.Any],
+    enable_json_detection: bool = True,
+) -> dict[str, t.Any] | list[t.Any] | None:
+    """Extract structured content from a tool result.
+
+    Tries multiple strategies in order:
+    1. Use existing structuredContent if present
+    2. Detect and extract JSON from text content (if enabled)
+    3. Return None if no structured content found
+
+    Args:
+        tool_result: MCP tool call result
+        enable_json_detection: Whether to try JSON detection in text content
+
+    Returns:
+        Structured content (dict or list) if found, None otherwise
+
+    Example:
+        >>> result = {
+        ...     "content": [{"type": "text", "text": '{"foo": "bar"}'}],
+        ...     "isError": False
+        ... }
+        >>> get_structured_content(result)
+        {'foo': 'bar'}
+    """
+    if not isinstance(tool_result, dict):
+        return None
+
+    # Strategy 1: Use existing structuredContent
+    if "structuredContent" in tool_result:
+        structured = tool_result["structuredContent"]
+        if structured and isinstance(structured, (dict, list)):
+            return structured
+
+    # Strategy 2: Try JSON detection in text content
+    if enable_json_detection:
+        json_data = extract_json_from_tool_result(tool_result)
+        if json_data:
+            return json_data
+
+    return None
+
+
+def apply_output_projection_to_tool_result(
+    tool_result: dict[str, t.Any],
+    output_schema: dict[str, t.Any] | None = None,
+    enable_json_detection: bool = True,
+) -> dict[str, t.Any]:
+    """Apply output schema projection to a tool result.
+
+    Complete workflow:
+    1. Extract structured content (using structuredContent or JSON detection)
+    2. Apply output_schema projection if specified
+    3. Return projected content
+
+    Args:
+        tool_result: MCP tool call result
+        output_schema: Optional output schema with source_field mappings
+        enable_json_detection: Whether to try JSON detection
+
+    Returns:
+        Projected structured content, or empty dict if no content found
+
+    Example:
+        >>> result = {
+        ...     "content": [{"type": "text", "text": '{"a": 1, "b": 2, "c": 3}'}]
+        ... }
+        >>> schema = {
+        ...     "type": "object",
+        ...     "properties": {
+        ...         "a": {"type": "integer"},
+        ...         "b": {"type": "integer"}
+        ...     }
+        ... }
+        >>> apply_output_projection_to_tool_result(result, schema)
+        {'a': 1, 'b': 2}
+    """
+    # Get structured content
+    structured = get_structured_content(tool_result, enable_json_detection)
+
+    if not structured:
+        return {}
+
+    # Apply projection if schema provided
+    if output_schema and isinstance(structured, dict):
+        return apply_output_projection(structured, output_schema)
+
+    # Return structured content as-is
+    if isinstance(structured, dict):
+        return structured
+
+    # If it's a list, wrap it in a dict
+    return {"items": structured}
