@@ -1,0 +1,134 @@
+{
+  "$comment": "MCP Gateway Demo - Knowledge Graph Focus",
+  "tools": [
+    {
+      "name": "read_graph",
+      "description": "Read the entire knowledge graph",
+      "inputSchema": {"type": "object", "properties": {}},
+      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+    },
+    {
+      "name": "list_entity_names",
+      "source": "read_graph",
+      "description": "Get just the names of all entities",
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {"type": "string"},
+            "source_field": "$.entities[*].name"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_entity_types",
+      "source": "read_graph",
+      "description": "Get entity types from the knowledge graph",
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {"type": "string"},
+            "source_field": "$.entities[*].entityType"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_connections",
+      "source": "read_graph",
+      "description": "Get simplified connection info: who connects to whom",
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "source_field": "$.relations[*]",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subject": {"type": "string", "source_field": "$.from"},
+                "predicate": {"type": "string", "source_field": "$.relationType"},
+                "object": {"type": "string", "source_field": "$.to"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "search_nodes",
+      "description": "Search for nodes in the knowledge graph",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query"}
+        },
+        "required": ["query"]
+      },
+      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+    },
+    {
+      "name": "create_entities",
+      "description": "Create new entities in the knowledge graph",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "entityType": {"type": "string"},
+                "observations": {"type": "array", "items": {"type": "string"}}
+              },
+              "required": ["name", "entityType", "observations"]
+            }
+          }
+        },
+        "required": ["entities"]
+      },
+      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+    },
+    {
+      "name": "remember",
+      "source": "create_entities",
+      "description": "Simplified alias - store facts in memory"
+    },
+    {
+      "name": "create_relations",
+      "description": "Create relations between entities",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "relations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {"type": "string"},
+                "to": {"type": "string"},
+                "relationType": {"type": "string"}
+              },
+              "required": ["from", "to", "relationType"]
+            }
+          }
+        },
+        "required": ["relations"]
+      },
+      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+    },
+    {
+      "name": "connect",
+      "source": "create_relations",
+      "description": "Simplified alias - create connections between facts"
+    }
+  ]
+}

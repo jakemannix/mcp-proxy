@@ -1,0 +1,99 @@
+{
+  "$comment": "MCP Gateway Demo - Full Feature Showcase",
+  "schemas": {
+    "FetchInput": {
+      "type": "object",
+      "properties": {
+        "url": {"type": "string", "description": "URL to fetch"}
+      },
+      "required": ["url"]
+    },
+    "EntityInput": {
+      "type": "object",
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "entityType": {"type": "string"},
+              "observations": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["name", "entityType", "observations"]
+          }
+        }
+      },
+      "required": ["entities"]
+    }
+  },
+  "tools": [
+    {
+      "name": "fetch",
+      "description": "Original fetch tool from mcp-server-fetch",
+      "inputSchema": {"$ref": "#/schemas/FetchInput"},
+      "server": {"command": "uvx", "args": ["mcp-server-fetch"]}
+    },
+    {
+      "name": "get_webpage",
+      "source": "fetch",
+      "description": "DEMO: Renamed fetch tool - retrieves content from a URL with semantic naming"
+    },
+    {
+      "name": "read_graph",
+      "description": "Read the entire knowledge graph",
+      "inputSchema": {"type": "object", "properties": {}},
+      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+    },
+    {
+      "name": "list_entity_names",
+      "source": "read_graph",
+      "description": "DEMO: Projected output - extracts just entity names from knowledge graph",
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {"type": "string"},
+            "source_field": "$.entities[*].name"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_connections",
+      "source": "read_graph",
+      "description": "DEMO: RDF-style triple projection from knowledge graph relations",
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "source_field": "$.relations[*]",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subject": {"type": "string", "source_field": "$.from"},
+                "predicate": {"type": "string", "source_field": "$.relationType"},
+                "object": {"type": "string", "source_field": "$.to"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "create_entities",
+      "description": "Create new entities in the knowledge graph",
+      "inputSchema": {"$ref": "#/schemas/EntityInput"},
+      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+    },
+    {
+      "name": "remember",
+      "source": "create_entities",
+      "description": "DEMO: Simplified alias for storing information in memory"
+    }
+  ]
+}

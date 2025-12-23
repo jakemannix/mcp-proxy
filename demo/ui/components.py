@@ -109,7 +109,7 @@ def ToolDetail(tool: dict):
                     Span("Output Projection", cls="label-text"),
                     cls="detail-label"
                 ),
-                Div(schema_html, cls="schema-box schema-projection"),
+                Pre(NotStr(schema_html), cls="schema-box schema-projection"),
                 cls="detail-section"
             )
         )
@@ -171,7 +171,7 @@ def build_test_form(tool_name: str, input_schema: dict):
             ),
             hx_post=f"/tool/{tool_name}/test",
             hx_target=f"#test-result-{tool_name}",
-            hx_swap="innerHTML",
+            hx_swap="outerHTML",
             cls="test-form"
         )
 
@@ -211,7 +211,7 @@ def build_test_form(tool_name: str, input_schema: dict):
         ),
         hx_post=f"/tool/{tool_name}/test",
         hx_target=f"#test-result-{tool_name}",
-        hx_swap="innerHTML",
+        hx_swap="outerHTML",
         cls="test-form"
     )
 
@@ -278,7 +278,7 @@ def ChatPanel(messages: list = None, scenarios: list = None):
             cls="section-header"
         ),
         Div(*message_elements, id="chat-messages", cls="chat-messages"),
-        Div(
+        Form(
             Textarea(
                 placeholder="Ask the agent something...",
                 name="prompt",
@@ -294,14 +294,14 @@ def ChatPanel(messages: list = None, scenarios: list = None):
                 Button(
                     UkIcon("send", height=16, width=16),
                     "Send",
+                    type="submit",
                     cls="btn-send",
-                    hx_post="/agent/send",
-                    hx_include="#chat-input",
-                    hx_target="#chat-messages",
-                    hx_swap="beforeend"
                 ),
                 cls="chat-controls"
             ),
+            hx_post="/agent/send",
+            hx_target="#chat-messages",
+            hx_swap="beforeend",
             cls="chat-input-area"
         ),
         cls="sidebar right-sidebar"

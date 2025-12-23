@@ -6,11 +6,16 @@ testing tools interactively, and chatting with an AI agent.
 
 import os
 import json
+import logging
 from pathlib import Path
 
 from fasthtml.common import *
 from monsterui.all import *
 import httpx
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 from components import (
     ToolCard, ToolDetail, ServerStatus, ChatMessage, ChatPanel
@@ -24,7 +29,10 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 # FastHTML app setup with dark theme
 hdrs = Theme.slate.headers(mode='dark') + [
-    Link(rel='stylesheet', href='/static/style.css', type='text/css'),
+    # HTMX for interactivity
+    Script(src="https://unpkg.com/htmx.org@2.0.4"),
+    # Custom styles
+    Link(rel='stylesheet', href='/style.css', type='text/css'),
     Link(rel='preconnect', href='https://fonts.googleapis.com'),
     Link(rel='preconnect', href='https://fonts.gstatic.com', crossorigin=True),
     Link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap'),
@@ -38,10 +46,23 @@ chat_messages: list = []
 
 
 def load_registry(path: str) -> dict:
-    """Load a registry JSON file."""
+    """Load a registry JSON file and resolve schema references."""
     try:
         with open(path) as f:
-            return json.load(f)
+            registry = json.load(f)
+
+        # Resolve $ref in inputSchema for each tool
+        schemas = registry.get("schemas", {})
+        for tool in registry.get("tools", []):
+            input_schema = tool.get("inputSchema", {})
+            if isinstance(input_schema, dict) and "$ref" in input_schema:
+                ref = input_schema["$ref"]
+                if ref.startswith("#/schemas/"):
+                    schema_name = ref.split("/")[-1]
+                    if schema_name in schemas:
+                        tool["inputSchema"] = schemas[schema_name].copy()
+
+        return registry
     except Exception as e:
         return {"error": str(e), "tools": []}
 
@@ -90,6 +111,12 @@ async def check_gateway_health() -> bool:
 
 async def call_tool(tool_name: str, arguments: dict) -> dict:
     """Call a tool via the MCP gateway."""
+    # Common headers for MCP requests
+    mcp_headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream"
+    }
+
     try:
         async with httpx.AsyncClient() as client:
             # Initialize session
@@ -105,7 +132,7 @@ async def call_tool(tool_name: str, arguments: dict) -> dict:
                         "clientInfo": {"name": "demo-ui", "version": "1.0.0"}
                     }
                 },
-                headers={"Content-Type": "application/json"},
+                headers=mcp_headers,
                 timeout=30.0
             )
             session_id = init_resp.headers.get("mcp-session-id", "")
@@ -114,10 +141,7 @@ async def call_tool(tool_name: str, arguments: dict) -> dict:
             await client.post(
                 f"{GATEWAY_URL}/mcp/",
                 json={"jsonrpc": "2.0", "method": "notifications/initialized"},
-                headers={
-                    "Content-Type": "application/json",
-                    "Mcp-Session-Id": session_id
-                },
+                headers={**mcp_headers, "Mcp-Session-Id": session_id},
                 timeout=5.0
             )
 
@@ -130,10 +154,7 @@ async def call_tool(tool_name: str, arguments: dict) -> dict:
                     "method": "tools/call",
                     "params": {"name": tool_name, "arguments": arguments}
                 },
-                headers={
-                    "Content-Type": "application/json",
-                    "Mcp-Session-Id": session_id
-                },
+                headers={**mcp_headers, "Mcp-Session-Id": session_id},
                 timeout=60.0
             )
             return resp.json()
@@ -151,7 +172,9 @@ async def index():
     # Load default registry if not loaded
     registries = list_registries()
     if not current_registry_path and registries:
-        current_registry_path = str(REGISTRIES_DIR / registries[0])
+        # Prefer showcase.json as default, otherwise use first available
+        default_reg = "showcase.json" if "showcase.json" in registries else registries[0]
+        current_registry_path = str(REGISTRIES_DIR / default_reg)
         current_registry = load_registry(current_registry_path)
 
     tools = get_tools()
@@ -291,8 +314,12 @@ async def get_tool_detail(name: str):
 @app.post("/tool/{name}/test")
 async def test_tool(name: str, request: Request):
     """Execute a tool with test inputs."""
+    logger.info(f"=== TEST TOOL CALLED: {name} ===")
+    
     form_data = await request.form()
     arguments = {k: v for k, v in form_data.items() if v}
+    logger.info(f"Form data received: {dict(form_data)}")
+    logger.info(f"Arguments after filtering: {arguments}")
 
     # Parse JSON values if they look like JSON
     for key, value in arguments.items():
@@ -303,13 +330,17 @@ async def test_tool(name: str, request: Request):
                 except json.JSONDecodeError:
                     pass
 
+    logger.info(f"Calling tool with arguments: {arguments}")
     result = await call_tool(name, arguments)
+    logger.info(f"Tool result: {result}")
 
-    return Div(
+    response_div = Div(
         Pre(json.dumps(result, indent=2), cls="result-code"),
         id=f"test-result-{name}",
         cls="test-result visible"
     )
+    logger.info(f"Returning response div with id: test-result-{name}")
+    return response_div
 
 
 @app.get("/agent/scenario")

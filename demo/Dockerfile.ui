@@ -1,0 +1,20 @@
+# FastHTML Demo UI Docker image
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install uv for fast Python package management
+RUN pip install uv
+
+# Copy requirements first for caching
+COPY ui/requirements.txt .
+RUN uv pip install --system -r requirements.txt
+
+# Copy application code
+COPY ui/ .
+
+# Default port
+EXPOSE 5001
+
+# Run the FastHTML app
+CMD ["python", "main.py"]
