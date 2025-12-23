@@ -1,0 +1,132 @@
+{
+  "$comment": [
+    "Demo: Virtual tools that structure text-only MCP server outputs",
+    "",
+    "This demonstrates the JSON-in-text extraction feature:",
+    "1. Source tool returns JSON embedded in content[0].text",
+    "2. Gateway detects and extracts the JSON automatically",
+    "3. Extracted JSON becomes structuredContent for the virtual tool",
+    "4. output_schema can then project/transform the structured data"
+  ],
+  "tools": [
+    {
+      "$comment": "=== RAW TIME SERVER (text-only output) ===",
+      "name": "time_raw",
+      "description": "Raw time server output - returns JSON embedded in text content",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone (e.g., 'America/New_York')"
+          }
+        },
+        "required": ["timezone"]
+      },
+      "server": {"command": "uvx", "args": ["mcp-server-time"]}
+    },
+    {
+      "$comment": "=== STRUCTURED TIME (extracts JSON from text) ===",
+      "name": "get_time",
+      "source": "time_raw",
+      "description": "Get current time with structured output (auto-extracted from text)",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timezone": {"type": "string", "description": "IANA timezone name"},
+          "datetime": {"type": "string", "description": "ISO 8601 datetime with offset"},
+          "day_of_week": {"type": "string", "description": "Day name (e.g., 'Tuesday')"},
+          "is_dst": {"type": "boolean", "description": "Whether daylight saving time is active"}
+        }
+      }
+    },
+    {
+      "$comment": "=== SIMPLIFIED TIME (projection on extracted JSON) ===",
+      "name": "what_time",
+      "source": "time_raw",
+      "description": "Simplified time output - just timezone and day",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tz": {"type": "string", "source_field": "$.timezone"},
+          "day": {"type": "string", "source_field": "$.day_of_week"}
+        }
+      }
+    },
+    {
+      "$comment": "=== RAW TIME CONVERSION ===",
+      "name": "convert_time_raw",
+      "description": "Raw time conversion - returns nested JSON in text",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source_timezone": {"type": "string"},
+          "time": {"type": "string", "description": "Time in HH:MM format"},
+          "target_timezone": {"type": "string"}
+        },
+        "required": ["source_timezone", "time", "target_timezone"]
+      },
+      "server": {"command": "uvx", "args": ["mcp-server-time"]}
+    },
+    {
+      "$comment": "=== FLATTENED TIME CONVERSION ===",
+      "name": "convert_timezone",
+      "source": "convert_time_raw",
+      "description": "Simplified timezone conversion with flattened structure",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "from_timezone": {"type": "string", "source_field": "$.source.timezone"},
+          "from_time": {"type": "string", "source_field": "$.source.datetime"},
+          "to_timezone": {"type": "string", "source_field": "$.target.timezone"},
+          "to_time": {"type": "string", "source_field": "$.target.datetime"},
+          "offset": {"type": "string", "source_field": "$.time_difference"}
+        }
+      }
+    },
+    {
+      "$comment": "=== FETCH SERVER WITH API RESPONSE EXTRACTION ===",
+      "name": "fetch_raw",
+      "description": "Raw fetch - can return JSON APIs with text prefix",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string"},
+          "max_length": {"type": "integer", "default": 10000}
+        },
+        "required": ["url"]
+      },
+      "server": {"command": "uvx", "args": ["mcp-server-fetch"]}
+    },
+    {
+      "$comment": "=== GITHUB REPO INFO (extract from fetch) ===",
+      "name": "get_github_repo",
+      "source": "fetch_raw",
+      "description": "Fetch GitHub repo info with structured output",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {"type": "string", "description": "Repository owner"},
+          "repo": {"type": "string", "description": "Repository name"}
+        },
+        "required": ["owner", "repo"]
+      },
+      "defaults": {
+        "url": "https://api.github.com/repos/${owner}/${repo}"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "full_name": {"type": "string"},
+          "description": {"type": "string"},
+          "stars": {"type": "integer", "source_field": "$.stargazers_count"},
+          "forks": {"type": "integer", "source_field": "$.forks_count"},
+          "language": {"type": "string"},
+          "url": {"type": "string", "source_field": "$.html_url"}
+        }
+      }
+    }
+  ]
+}
+

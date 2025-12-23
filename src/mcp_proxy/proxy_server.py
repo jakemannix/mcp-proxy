@@ -11,7 +11,11 @@ from mcp import server, types
 from mcp.client.session import ClientSession
 from typing import TypedDict
 
-from .output_transformer import apply_output_projection, strip_source_fields
+from .output_transformer import (
+    apply_output_projection,
+    get_structured_content,
+    strip_source_fields,
+)
 
 class ToolOverride(TypedDict, total=False):
     """Configuration for overriding tool behavior."""
@@ -193,17 +197,35 @@ async def create_proxy_server(
                     original_name,
                     arguments,
                 )
-                
-                # Apply output projection if override exists and result has structuredContent
-                if (active_override and
-                    active_override.get("output_schema") and
-                    hasattr(result, "structuredContent") and
-                    isinstance(result.structuredContent, dict)):
 
+                # Process output schema if defined
+                if active_override and active_override.get("output_schema"):
                     output_schema = active_override["output_schema"]
-                    result.structuredContent = apply_output_projection(
-                        result.structuredContent, output_schema
-                    )
+
+                    # Get structured content - either existing or extracted from text
+                    structured = None
+                    if hasattr(result, "structuredContent") and isinstance(
+                        result.structuredContent, dict
+                    ):
+                        # Use existing structuredContent
+                        structured = result.structuredContent
+                    else:
+                        # Try to extract JSON from text content
+                        # Convert result to dict format for get_structured_content
+                        result_dict = {
+                            "content": [
+                                {"type": c.type, "text": getattr(c, "text", None)}
+                                for c in (result.content or [])
+                                if hasattr(c, "type")
+                            ]
+                        }
+                        structured = get_structured_content(result_dict)
+
+                    # Apply projection and set structuredContent
+                    if structured and isinstance(structured, dict):
+                        result.structuredContent = apply_output_projection(
+                            structured, output_schema
+                        )
 
                 return types.ServerResult(result)
             except Exception as e:  # noqa: BLE001
