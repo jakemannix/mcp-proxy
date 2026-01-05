@@ -11,6 +11,7 @@ import uvicorn
 from mcp.client.session import ClientSession
 from mcp.client.sse import sse_client
 from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 from mcp.server import Server as MCPServerSDK
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -186,11 +187,15 @@ async def run_mcp_server(
                     await session.initialize()
                     active_backends[server_id] = session
                 elif config.url:
-                    # Remote Server (SSE)
-                    logger.info("Initializing remote backend: %s", config.url)
+                    # Remote Server (SSE or Streamable HTTP)
+                    logger.info("Initializing remote backend: %s (transport: %s)", config.url, config.transport)
                     # TODO: Support headers/auth if needed
-                    sse_streams = await stack.enter_async_context(sse_client(config.url))
-                    session = await stack.enter_async_context(ClientSession(*sse_streams))
+                    if config.transport == "streamablehttp":
+                        http_streams = await stack.enter_async_context(streamablehttp_client(config.url))
+                        session = await stack.enter_async_context(ClientSession(*http_streams))
+                    else:
+                        sse_streams = await stack.enter_async_context(sse_client(config.url))
+                        session = await stack.enter_async_context(ClientSession(*sse_streams))
                     await session.initialize()
                     active_backends[server_id] = session
             except Exception:

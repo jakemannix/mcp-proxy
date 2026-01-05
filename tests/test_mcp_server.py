@@ -682,6 +682,7 @@ async def test_run_mcp_server_with_url_backend(
         mock_sse_client.assert_called_once_with("http://localhost:8080/sse")
 
         mock_logger.info.assert_any_call(
-            "Initializing remote backend: %s",
+            "Initializing remote backend: %s (transport: %s)",
             "http://localhost:8080/sse",
+            "sse",
         )
