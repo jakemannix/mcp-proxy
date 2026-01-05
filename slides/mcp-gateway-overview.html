@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Gateway - Middleware as Configuration</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+    <style>
+        :root {
+            --r-heading-color: #58a6ff;
+            --r-link-color: #58a6ff;
+        }
+        .reveal h1, .reveal h2, .reveal h3 { text-transform: none; }
+        .reveal pre { width: 100%; font-size: 0.55em; }
+        .reveal pre code { max-height: 500px; }
+        .reveal ul { font-size: 0.85em; }
+        .reveal .small { font-size: 0.7em; }
+        .reveal .tiny { font-size: 0.55em; }
+        .reveal .highlight { color: #58a6ff; }
+        .reveal .muted { color: #8b949e; }
+        .reveal .success { color: #3fb950; }
+        .reveal .warning { color: #d29922; }
+        .reveal .file-link {
+            font-family: monospace;
+            background: #161b22;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+        }
+        .two-column { display: flex; gap: 2em; }
+        .two-column > * { flex: 1; }
+        .reveal table { font-size: 0.65em; }
+        .reveal th, .reveal td { padding: 0.3em 0.5em; }
+    </style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- Title Slide -->
+<section>
+    <h1>MCP Gateway</h1>
+    <h3 class="highlight">Middleware as Configuration</h3>
+    <p class="muted">Evolving mcp-proxy into an intelligent composition layer</p>
+    <p class="small">
+        Fork of <a href="https://github.com/sparfenyuk/mcp-proxy">sparfenyuk/mcp-proxy</a><br>
+        Branch: <code>mcp-gateway-prototype</code>
+    </p>
+</section>
+
+<!-- The Problem -->
+<section>
+    <section>
+        <h2>The Problem</h2>
+        <h3 class="muted">Raw MCP Integration</h3>
+    </section>
+    <section>
+        <h3>Context Window Bloat</h3>
+        <ul>
+            <li>Each tool exposes <em>all</em> parameters</li>
+            <li>Complex output schemas consume tokens</li>
+            <li>Irrelevant fields create noise</li>
+            <li>No control over what LLM sees</li>
+        </ul>
+        <pre><code class="language-json">{
+  "entities": [
+    {"name": "Alice", "entityType": "person",
+     "observations": ["...", "...", "..."],
+     "metadata": {...}, "timestamps": {...}}
+  ]
+}
+// When you only needed: ["Alice"]</code></pre>
+    </section>
+    <section>
+        <h3>The Analogy</h3>
+        <blockquote>
+            "If LLMs are an Operating System and MCP servers are libraries,<br>
+            raw MCP integration is like <strong>unrolling library source into main()</strong>"
+        </blockquote>
+        <p class="fragment">We need a <span class="highlight">composition layer</span></p>
+    </section>
+</section>
+
+<!-- The Solution -->
+<section>
+    <section>
+        <h2>The Solution</h2>
+        <h3 class="highlight">MCP Gateway</h3>
+    </section>
+    <section>
+        <h3>Gateway Architecture</h3>
+        <pre class="mermaid"><code>
+Agent/LLM  ──►  MCP Gateway  ──►  Backend MCP Servers
+              │
+              ├─ Tool Adaptation
+              ├─ Schema Projection
+              ├─ Default Injection
+              └─ Output Transformation
+        </code></pre>
+        <p class="small muted">All transformation is declarative configuration</p>
+    </section>
+    <section>
+        <h3>Two Minimum Viable Abstractions</h3>
+        <div class="two-column">
+            <div>
+                <h4 class="success">MVA1: Tool Adaptation</h4>
+                <p class="small">Control over the context window</p>
+                <ul class="small">
+                    <li>Field renaming/projection</li>
+                    <li>Override descriptions</li>
+                    <li>Set defaults/hidden params</li>
+                    <li>Output field mapping</li>
+                </ul>
+                <p class="success small">Status: Implemented</p>
+            </div>
+            <div>
+                <h4 class="warning">MVA2: Constraint Hints</h4>
+                <p class="small">Planning assists + enforcement</p>
+                <ul class="small">
+                    <li>Capability hints (gateway-enforced)</li>
+                    <li>Behavior hints (LLM guidance)</li>
+                    <li>Permission/quota management</li>
+                    <li>Data classification</li>
+                </ul>
+                <p class="warning small">Status: Planned</p>
+            </div>
+        </div>
+    </section>
+</section>
+
+<!-- MVA1 Deep Dive -->
+<section>
+    <section>
+        <h2>MVA1: Tool Adaptation Layer</h2>
+        <p class="file-link">src/mcp_proxy/config_loader.py</p>
+    </section>
+    <section>
+        <h3>Feature: Tool Renaming</h3>
+        <p class="small">Expose backend tools under different names via <code>source</code> field</p>
+        <pre><code class="language-json">{
+  "tools": [
+    {
+      "name": "research_url",
+      "source": "fetch",
+      "description": "Fetch and analyze a web page",
+      "server": {"command": "uvx", "args": ["mcp-server-fetch"]}
+    }
+  ]
+}</code></pre>
+        <p class="small muted">LLM sees <code>research_url</code>, gateway calls <code>fetch</code></p>
+    </section>
+    <section>
+        <h3>Feature: Field Defaults & Hiding</h3>
+        <p class="small">Inject values and remove from schema</p>
+        <pre><code class="language-json">{
+  "name": "get_nyc_weather",
+  "source": "get_weather",
+  "defaults": {
+    "city": "New York",
+    "api_key": "${WEATHER_API_KEY}"
+  },
+  "hide_fields": ["units", "format"]
+}</code></pre>
+        <ul class="small">
+            <li>Fields with defaults are auto-hidden</li>
+            <li>Environment variables supported</li>
+            <li>LLM never sees hidden params</li>
+        </ul>
+    </section>
+    <section>
+        <h3>Feature: Output Schema Projection</h3>
+        <p class="small">JSONPath expressions to transform responses</p>
+        <p class="file-link">src/mcp_proxy/output_transformer.py</p>
+        <pre><code class="language-json">{
+  "name": "list_entity_names",
+  "source": "read_graph",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "names": {
+        "type": "array",
+        "items": {"type": "string"},
+        "source_field": "$.entities[*].name"
+      }
+    }
+  }
+}</code></pre>
+        <p class="small">Result: <code>{"names": ["Alice", "Bob", "Carol"]}</code></p>
+    </section>
+    <section>
+        <h3>JSONPath Support</h3>
+        <table>
+            <thead>
+                <tr><th>Pattern</th><th>Example</th><th>Result</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Root path</td><td><code>$.foo.bar</code></td><td>Nested value</td></tr>
+                <tr><td>Array index</td><td><code>$.items[0].name</code></td><td>First element</td></tr>
+                <tr><td>Wildcard</td><td><code>$.items[*].id</code></td><td>All IDs as array</td></tr>
+                <tr><td>Deep nested</td><td><code>$.a.b.c.d</code></td><td>Deeply nested value</td></tr>
+            </tbody>
+        </table>
+        <p class="tiny muted">Powered by jsonpath-ng library</p>
+    </section>
+</section>
+
+<!-- Text Extraction Pipeline -->
+<section>
+    <section>
+        <h2>Text Extraction Pipeline</h2>
+        <p class="small muted">Making unstructured responses structured</p>
+    </section>
+    <section>
+        <h3>Two-Phase Extraction</h3>
+        <div class="two-column">
+            <div>
+                <h4 class="success">Phase 1: JSON Detection</h4>
+                <p class="small">Auto-extract JSON from text</p>
+                <ul class="small">
+                    <li>Pattern-based extraction</li>
+                    <li>Balanced brace parsing</li>
+                    <li>Multiple fallback strategies</li>
+                </ul>
+                <p class="success small">Status: Implemented</p>
+                <p class="file-link">json_detector.py</p>
+            </div>
+            <div>
+                <h4 class="success">Phase 2: Markdown Lists</h4>
+                <p class="small">Parse formatted text to structured data</p>
+                <ul class="small">
+                    <li>Numbered list parsing</li>
+                    <li>Bullet list parsing</li>
+                    <li>Regex field extraction</li>
+                </ul>
+                <p class="success small">Status: Implemented</p>
+                <p class="file-link">markdown_list_parser.py</p>
+            </div>
+        </div>
+    </section>
+    <section>
+        <h3>Phase 1: JSON-in-Text</h3>
+        <p>Many MCP servers return JSON <em>inside</em> text fields</p>
+        <pre><code class="language-json">// What servers return:
+{
+  "content": [{
+    "type": "text",
+    "text": "Here is the data: {\"temp\": 72.5, \"humidity\": 45}"
+  }]
+}
+
+// What we want:
+{
+  "structuredContent": {"temp": 72.5, "humidity": 45}
+}</code></pre>
+    </section>
+    <section>
+        <h3>JSON Detection Strategies</h3>
+        <ol class="small">
+            <li><strong>Pure JSON parsing</strong> - Direct parse attempt</li>
+            <li><strong>Pattern-based extraction</strong> - Find JSON after text prefixes</li>
+            <li><strong>Balanced brace extraction</strong> - Handle trailing text</li>
+            <li><strong>Multiple fallbacks</strong> - Graceful degradation</li>
+        </ol>
+        <pre><code class="language-python"># Examples handled:
+'{"foo": "bar"}'                    # Pure JSON
+'Response: {"result": 42}'          # Prefixed
+'Data: {"a": 1} more text'          # Trailing
+'{"nested": {"deep": "value"}}'     # Complex</code></pre>
+    </section>
+    <section>
+        <h3>MCP Server Survey</h3>
+        <table>
+            <thead>
+                <tr><th>Server</th><th>outputSchema Usage</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>server-filesystem</td><td class="success">100% (14/14 tools)</td></tr>
+                <tr><td>server-memory</td><td class="success">100% (9/9 tools)</td></tr>
+                <tr><td>server-github</td><td class="warning">0% - JSON in text</td></tr>
+                <tr><td>server-puppeteer</td><td class="warning">0% - JSON in text</td></tr>
+                <tr><td>brave-search</td><td class="warning">0% - Markdown lists</td></tr>
+            </tbody>
+        </table>
+        <p class="tiny muted">See: demo/mcp-snapshots/README.md</p>
+    </section>
+    <section>
+        <h3>Phase 2: Markdown List Parsing</h3>
+        <p class="small">For servers returning formatted text (search, issues, etc.)</p>
+        <pre><code class="language-json">{
+  "name": "search_results",
+  "textExtraction": {
+    "parser": "markdown_numbered_list",
+    "list_field": "results",
+    "item_patterns": {
+      "title": {"regex": "\\*\\*([^*]+)\\*\\*", "required": true},
+      "url": {"regex": "https?://[^\\s]+"},
+      "stars": {"regex": "★ ([\\d,]+)", "type": "integer"}
+    }
+  }
+}</code></pre>
+    </section>
+    <section>
+        <h3>Markdown Extraction Features</h3>
+        <ul class="small">
+            <li><strong>Numbered lists</strong> - <code>1. Item</code>, <code>2. Item</code></li>
+            <li><strong>Bullet lists</strong> - <code>- Item</code>, <code>* Item</code></li>
+            <li><strong>Regex patterns</strong> - Custom field extraction per item</li>
+            <li><strong>Type coercion</strong> - integer, number, boolean</li>
+            <li><strong>Required fields</strong> - Skip items missing required data</li>
+            <li><strong>Multiline support</strong> - Capture descriptions across lines</li>
+        </ul>
+        <pre><code class="language-text">1. **anthropics/mcp-python** (★ 2,341)
+   Official Python SDK for MCP
+   https://github.com/anthropics/mcp-python</code></pre>
+    </section>
+</section>
+
+<!-- Registry System -->
+<section>
+    <section>
+        <h2>Registry Configuration</h2>
+        <p class="file-link">registry.json</p>
+    </section>
+    <section>
+        <h3>Registry Structure</h3>
+        <pre><code class="language-json">{
+  "schemas": {
+    "FetchInput": {
+      "type": "object",
+      "properties": {
+        "url": {"type": "string"},
+        "max_length": {"type": "integer"}
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "fetch",
+      "inputSchema": {"$ref": "#/schemas/FetchInput"},
+      "server": {
+        "command": "uvx",
+        "args": ["mcp-server-fetch"],
+        "transport": "stdio"
+      }
+    }
+  ]
+}</code></pre>
+    </section>
+    <section>
+        <h3>Tool Inheritance</h3>
+        <pre><code class="language-json">{
+  "tools": [
+    {
+      "name": "base_fetch",
+      "server": {"command": "uvx", "args": ["mcp-server-fetch"]}
+    },
+    {
+      "name": "research_url",
+      "source": "base_fetch",
+      "description": "Custom description"
+    },
+    {
+      "name": "cached_fetch",
+      "source": "research_url",
+      "defaults": {"cache": true}
+    }
+  ]
+}</code></pre>
+        <p class="small">Chain inheritance: <code>cached_fetch</code> → <code>research_url</code> → <code>base_fetch</code></p>
+    </section>
+    <section>
+        <h3>Key Data Structures</h3>
+        <pre><code class="language-python">@dataclass(frozen=True)
+class ServerConfig:
+    command: str | None
+    args: tuple[str, ...]
+    url: str | None
+    transport: str
+    env: tuple[tuple[str, str], ...]  # Hashable!
+
+@dataclass
+class VirtualTool:
+    name: str
+    description: str
+    input_schema: dict
+    server_id: str
+    defaults: dict
+    output_schema: dict | None
+    text_extraction: dict | None  # Phase 2</code></pre>
+        <p class="file-link">src/mcp_proxy/config_loader.py</p>
+    </section>
+</section>
+
+<!-- MVA2 Preview -->
+<section>
+    <section>
+        <h2>MVA2: Constraint Hints</h2>
+        <p class="warning">Planned - Not Yet Implemented</p>
+        <p class="file-link">docs/tool-hints-plan.md</p>
+    </section>
+    <section>
+        <h3>Capability Hints (Gateway-Enforced)</h3>
+        <ul class="small">
+            <li><code>requiredPermissions</code> - Remove if user lacks access</li>
+            <li><code>dataClassification</code> - Track sensitive data flow</li>
+            <li><code>costTier</code> - Remove based on billing plan</li>
+            <li><code>quotaKey</code> - Remove if quota exhausted</li>
+            <li><code>networkDependency</code> - Remove if offline</li>
+            <li><code>timingWindow</code> - Remove outside hours</li>
+        </ul>
+        <p class="muted small">Binary decisions: tool is available or not</p>
+    </section>
+    <section>
+        <h3>Behavior Hints (LLM Planning)</h3>
+        <ul class="small">
+            <li><code>idempotent</code> - Safe to retry</li>
+            <li><code>latency</code> - "instant" | "seconds" | "minutes"</li>
+            <li><code>confirmationNeeded</code> - Requires user approval</li>
+            <li><code>reversible</code> - Can be undone</li>
+            <li><code>outputSize</code> - Expected response size</li>
+            <li><code>reliability</code> - Success rate for fallback planning</li>
+        </ul>
+        <p class="muted small">Soft guidance for intelligent planning</p>
+    </section>
+</section>
+
+<!-- Architecture -->
+<section>
+    <section>
+        <h2>Architecture Overview</h2>
+    </section>
+    <section>
+        <h3>Key Source Files</h3>
+        <table>
+            <thead>
+                <tr><th>File</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>__main__.py</code></td><td>CLI entry, argument parsing</td></tr>
+                <tr><td><code>mcp_server.py</code></td><td>Gateway: multi-backend aggregation</td></tr>
+                <tr><td><code>proxy_server.py</code></td><td>Single-backend proxy + overrides</td></tr>
+                <tr><td><code>config_loader.py</code></td><td>Registry parsing, VirtualTool</td></tr>
+                <tr><td><code>output_transformer.py</code></td><td>JSONPath extraction & projection</td></tr>
+                <tr><td><code>json_detector.py</code></td><td>JSON-in-text detection</td></tr>
+                <tr><td><code>markdown_list_parser.py</code></td><td>Markdown list extraction</td></tr>
+            </tbody>
+        </table>
+    </section>
+    <section>
+        <h3>Request Flow</h3>
+        <pre><code class="language-text">
+┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+│   Agent     │───►│  MCP Gateway │───►│ MCP Server  │
+│   (LLM)     │    │              │    │  (Backend)  │
+└─────────────┘    └──────────────┘    └─────────────┘
+                         │
+    1. Receive tool call │
+    2. Look up VirtualTool
+    3. Apply defaults
+    4. Map to source tool
+    5. Forward to backend
+    6. Apply output projection
+    7. Return transformed result
+        </code></pre>
+    </section>
+    <section>
+        <h3>Transport Support</h3>
+        <ul>
+            <li><strong>stdio</strong> - Local process communication</li>
+            <li><strong>SSE</strong> - Server-Sent Events over HTTP</li>
+            <li><strong>Streamable HTTP</strong> - New MCP transport</li>
+        </ul>
+        <pre><code class="language-bash"># Run as gateway
+uv run mcp-proxy --named-server-config ./registry.json --port 8080
+
+# Run as SSE-to-stdio bridge
+uv run mcp-proxy http://localhost:8080/sse</code></pre>
+    </section>
+</section>
+
+<!-- Demo & Testing -->
+<section>
+    <section>
+        <h2>Demo & Testing</h2>
+    </section>
+    <section>
+        <h3>FastHTML Demo UI</h3>
+        <p class="file-link">demo/ui/main.py</p>
+        <ul class="small">
+            <li>Registry viewer (load from file)</li>
+            <li>Tool browser with schema display</li>
+            <li>Interactive tool testing</li>
+            <li>Chat interface with AI agent</li>
+            <li>Pre-built scenarios</li>
+        </ul>
+        <pre><code class="language-bash">cd demo && docker-compose up</code></pre>
+    </section>
+    <section>
+        <h3>Demo Scenarios</h3>
+        <p class="file-link">demo/ui/scenarios.py</p>
+        <ol class="small">
+            <li><strong>Knowledge Graph</strong> - Entity creation & listing projection</li>
+            <li><strong>Web Research</strong> - Renamed fetch tool</li>
+            <li><strong>Multi-Tool</strong> - Memory + fetch together</li>
+            <li><strong>Build Connections</strong> - Relations & projections</li>
+            <li><strong>JSON Extraction</strong> - JSON-in-text from mcp-server-time</li>
+            <li><strong>Day Projection</strong> - JSON extraction + field projection</li>
+            <li><strong>Timezone Offset</strong> - Nested JSON extraction</li>
+            <li><strong>GitHub Search</strong> - Array projection from API responses</li>
+        </ol>
+    </section>
+    <section>
+        <h3>Test Coverage</h3>
+        <div class="two-column small">
+            <div>
+                <ul>
+                    <li><code>test_config_loader.py</code></li>
+                    <li><code>test_json_detector.py</code></li>
+                    <li><code>test_json_integration.py</code></li>
+                    <li><code>test_output_transformer.py</code></li>
+                    <li><code>test_output_schema_jsonpath.py</code></li>
+                    <li><code>test_markdown_list_parser.py</code></li>
+                </ul>
+            </div>
+            <div>
+                <ul>
+                    <li><code>test_proxy_server.py</code></li>
+                    <li><code>test_mcp_server.py</code></li>
+                    <li><code>test_sidecar_overrides.py</code></li>
+                    <li><code>test_sidecar_output_schema.py</code></li>
+                    <li><code>test_agent_card.py</code></li>
+                </ul>
+            </div>
+        </div>
+        <pre><code class="language-bash">uv run pytest  # 203 tests (Python 3.12)</code></pre>
+    </section>
+</section>
+
+<!-- Use Cases -->
+<section>
+    <section>
+        <h2>Use Cases</h2>
+    </section>
+    <section>
+        <h3>Context Window Management</h3>
+        <pre><code class="language-json">// Before: Full response
+{
+  "entities": [
+    {"name": "Alice", "type": "person",
+     "observations": ["works at Acme", "likes cats"],
+     "created": "2024-01-15", "updated": "2024-01-20"}
+  ]
+}
+
+// After: Projected
+{"names": ["Alice"]}</code></pre>
+        <p class="small">90%+ token reduction for listing operations</p>
+    </section>
+    <section>
+        <h3>Secret Injection</h3>
+        <pre><code class="language-json">{
+  "name": "query_database",
+  "source": "sql_query",
+  "defaults": {
+    "connection_string": "${DATABASE_URL}"
+  },
+  "hide_fields": ["connection_string"]
+}</code></pre>
+        <p class="small">LLM never sees credentials</p>
+    </section>
+    <section>
+        <h3>Domain Vocabulary</h3>
+        <pre><code class="language-json">{
+  "name": "get_customer",
+  "source": "get_user",
+  "description": "Retrieve customer information",
+  "inputSchema": {
+    "properties": {
+      "customer_id": {"source_field": "user_id"}
+    }
+  }
+}</code></pre>
+        <p class="small">Match your domain language</p>
+    </section>
+    <section>
+        <h3>Multi-Persona Exposure</h3>
+        <p class="small">Same backend, different views</p>
+        <pre><code class="language-json">{
+  "tools": [
+    {
+      "name": "admin_user_lookup",
+      "source": "get_user",
+      "outputSchema": {...full fields...}
+    },
+    {
+      "name": "public_user_profile",
+      "source": "get_user",
+      "outputSchema": {...limited fields...}
+    }
+  ]
+}</code></pre>
+    </section>
+</section>
+
+<!-- Future Work -->
+<section>
+    <section>
+        <h2>Future Work</h2>
+        <p class="file-link">docs/gateway-infrastructure.md</p>
+    </section>
+    <section>
+        <h3>Text Extraction Roadmap</h3>
+        <div class="two-column small">
+            <div>
+                <h4 class="success">✓ Phase 1: JSON Detection</h4>
+                <ul>
+                    <li>Pattern-based extraction</li>
+                    <li>Balanced brace parsing</li>
+                    <li>outputSchema projection</li>
+                </ul>
+                <h4 class="success">✓ Phase 2: Markdown Lists</h4>
+                <ul>
+                    <li>Numbered/bullet parsing</li>
+                    <li>Regex field extraction</li>
+                    <li>Type coercion</li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="warning">Phase 3: Advanced Extraction</h4>
+                <ul>
+                    <li>Table parsing (ASCII/Markdown)</li>
+                    <li>Key-value pair extraction</li>
+                    <li>Hierarchical markdown (headers)</li>
+                </ul>
+                <h4 class="muted">Phase 4: Hybrid Approaches</h4>
+                <ul>
+                    <li>LLM-assisted extraction</li>
+                    <li>Schema inference</li>
+                    <li>Adaptive parsing</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    <section>
+        <h3>Infrastructure Roadmap</h3>
+        <div class="two-column small">
+            <div>
+                <h4>Performance</h4>
+                <ul>
+                    <li>O(1) tool lookup (dict)</li>
+                    <li>Pre-compute schemas</li>
+                    <li>Connection pooling</li>
+                </ul>
+                <h4>Resilience</h4>
+                <ul>
+                    <li>Health checks</li>
+                    <li>Backend reconnection</li>
+                    <li>Graceful degradation</li>
+                </ul>
+            </div>
+            <div>
+                <h4>Streaming</h4>
+                <ul>
+                    <li>Progress notifications</li>
+                    <li>Streaming passthrough</li>
+                </ul>
+                <h4>Observability</h4>
+                <ul>
+                    <li>Metrics instrumentation</li>
+                    <li>Structured logging</li>
+                    <li>Tracing support</li>
+                </ul>
+            </div>
+        </div>
+        <p class="file-link">docs/gateway-infrastructure.md</p>
+    </section>
+    <section>
+        <h3>MVA2 Implementation</h3>
+        <ul class="small">
+            <li>Capability hint enforcement engine</li>
+            <li>Permission middleware</li>
+            <li>Quota tracking system</li>
+            <li>Data taint propagation</li>
+            <li>LLM behavior hint injection</li>
+        </ul>
+        <p class="file-link">docs/tool-hints-plan.md</p>
+    </section>
+</section>
+
+<!-- Resources -->
+<section>
+    <section>
+        <h2>Resources</h2>
+    </section>
+    <section>
+        <h3>Documentation</h3>
+        <ul class="small">
+            <li><a href="../docs/motivation.md">docs/motivation.md</a> - Value proposition</li>
+            <li><a href="../docs/manual-testing.md">docs/manual-testing.md</a> - Testing guide</li>
+            <li><a href="../docs/gateway-infrastructure.md">docs/gateway-infrastructure.md</a> - NFRs</li>
+            <li><a href="../docs/tool-hints-plan.md">docs/tool-hints-plan.md</a> - MVA2 design</li>
+            <li><a href="../docs/sidecar.md">docs/sidecar.md</a> - Sidecar proxy</li>
+        </ul>
+    </section>
+    <section>
+        <h3>Demo Files</h3>
+        <ul class="small">
+            <li><a href="../demo/registries/showcase.json">demo/registries/showcase.json</a> - Full feature showcase</li>
+            <li><a href="../demo/registries/memory-demo.json">demo/registries/memory-demo.json</a> - Memory projections</li>
+            <li><a href="../demo/ui/main.py">demo/ui/main.py</a> - FastHTML demo</li>
+            <li><a href="../demo/mcp-snapshots/README.md">demo/mcp-snapshots/README.md</a> - Server analysis</li>
+        </ul>
+    </section>
+    <section>
+        <h3>External Links</h3>
+        <ul class="small">
+            <li><a href="https://github.com/sparfenyuk/mcp-proxy">sparfenyuk/mcp-proxy</a> - Upstream repo</li>
+            <li><a href="https://modelcontextprotocol.io/">modelcontextprotocol.io</a> - MCP specification</li>
+            <li><a href="https://github.com/modelcontextprotocol/servers">MCP Server Directory</a></li>
+            <li><a href="https://pypi.org/project/jsonpath-ng/">jsonpath-ng</a> - JSONPath library</li>
+        </ul>
+    </section>
+    <section>
+        <h2>Thank You</h2>
+        <p class="highlight">Questions?</p>
+        <pre><code class="language-bash"># Quick start
+git clone https://github.com/sparfenyuk/mcp-proxy
+git checkout mcp-gateway-prototype
+uv sync && uv run pytest</code></pre>
+    </section>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script>
+    Reveal.initialize({
+        hash: true,
+        slideNumber: true,
+        plugins: [RevealHighlight, RevealNotes],
+        transition: 'slide',
+        backgroundTransition: 'fade'
+    });
+</script>
+</body>
+</html>
+</code></pre>
