@@ -94,6 +94,74 @@
       "name": "remember",
       "source": "create_entities",
       "description": "DEMO: Simplified alias for storing information in memory"
+    },
+    {
+      "$comment": "=== TIME SERVER - JSON-in-text extraction demos ===",
+      "name": "get_current_time",
+      "description": "Get current time - returns JSON embedded in text (no structuredContent)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone (e.g., 'America/New_York', 'Europe/London')"
+          }
+        },
+        "required": ["timezone"]
+      },
+      "server": {"command": "uvx", "args": ["mcp-server-time"]}
+    },
+    {
+      "name": "get_time_structured",
+      "source": "get_current_time",
+      "description": "DEMO: JSON extraction - auto-extracts JSON from text into structuredContent",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timezone": {"type": "string"},
+          "datetime": {"type": "string"},
+          "day_of_week": {"type": "string"},
+          "is_dst": {"type": "boolean"}
+        }
+      }
+    },
+    {
+      "name": "what_day_is_it",
+      "source": "get_current_time",
+      "description": "DEMO: JSON extraction + projection - extracts and projects to just day name",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "day": {"type": "string", "source_field": "$.day_of_week"}
+        }
+      }
+    },
+    {
+      "name": "convert_time",
+      "description": "Convert time between timezones - returns nested JSON in text",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source_timezone": {"type": "string", "description": "Source timezone"},
+          "time": {"type": "string", "description": "Time in HH:MM format"},
+          "target_timezone": {"type": "string", "description": "Target timezone"}
+        },
+        "required": ["source_timezone", "time", "target_timezone"]
+      },
+      "server": {"command": "uvx", "args": ["mcp-server-time"]}
+    },
+    {
+      "name": "timezone_offset",
+      "source": "convert_time",
+      "description": "DEMO: Nested JSON projection - extracts time_difference from nested structure",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "from_tz": {"type": "string", "source_field": "$.source.timezone"},
+          "to_tz": {"type": "string", "source_field": "$.target.timezone"},
+          "offset": {"type": "string", "source_field": "$.time_difference"}
+        }
+      }
     }
   ]
 }

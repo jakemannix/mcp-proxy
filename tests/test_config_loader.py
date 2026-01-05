@@ -457,3 +457,133 @@ def test_chained_source_inheritance(
     # All tools should have the same server_id
     server_ids = {t.server_id for t in tools}
     assert len(server_ids) == 1
+
+
+def test_virtual_tool_inherits_input_schema(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that virtual tools inherit inputSchema from source when not specified."""
+    config_content = {
+        "tools": [
+            {
+                "name": "source_tool",
+                "server": {"command": "myserver"},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "timezone": {"type": "string"},
+                        "format": {"type": "string"},
+                    },
+                    "required": ["timezone"],
+                },
+            },
+            {
+                "name": "virtual_tool",
+                "source": "source_tool",
+                # No inputSchema - should inherit from source
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    assert len(tools) == 2
+    virtual_tool = next(t for t in tools if t.name == "virtual_tool")
+
+    # Should have inherited the schema
+    assert virtual_tool.input_schema["type"] == "object"
+    assert "timezone" in virtual_tool.input_schema["properties"]
+    assert "format" in virtual_tool.input_schema["properties"]
+    assert "timezone" in virtual_tool.input_schema["required"]
+
+
+def test_virtual_tool_missing_required_fields_disabled(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that virtual tools missing required source fields are disabled."""
+    config_content = {
+        "tools": [
+            {
+                "name": "source_tool",
+                "server": {"command": "myserver"},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "required_field": {"type": "string"},
+                        "optional_field": {"type": "string"},
+                    },
+                    "required": ["required_field"],
+                },
+            },
+            {
+                "name": "bad_virtual_tool",
+                "source": "source_tool",
+                # Custom schema that's missing the required field
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "optional_field": {"type": "string"},
+                    },
+                },
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # Only the source tool should be loaded - virtual tool should be disabled
+    assert len(tools) == 1
+    assert tools[0].name == "source_tool"
+
+    # Should have logged an error
+    assert "missing required fields" in caplog.text.lower()
+    assert "bad_virtual_tool" in caplog.text
+
+
+def test_virtual_tool_required_fields_via_defaults(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that virtual tools can satisfy required fields via defaults."""
+    config_content = {
+        "tools": [
+            {
+                "name": "source_tool",
+                "server": {"command": "myserver"},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "api_key": {"type": "string"},
+                        "query": {"type": "string"},
+                    },
+                    "required": ["api_key", "query"],
+                },
+            },
+            {
+                "name": "simplified_tool",
+                "source": "source_tool",
+                "defaults": {"api_key": "hardcoded_key"},
+                # Only exposes query - api_key is satisfied by default
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # Both tools should be loaded
+    assert len(tools) == 2
+    simplified = next(t for t in tools if t.name == "simplified_tool")
+    
+    # api_key is hidden, only query exposed
+    assert "api_key" not in simplified.input_schema.get("properties", {})
+    assert "query" in simplified.input_schema["properties"]

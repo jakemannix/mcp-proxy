@@ -21,8 +21,9 @@ services:
     environment:
       - REGISTRY_PATH=${REGISTRY_PATH:-/app/registries/showcase.json}
     command: >
-      uv run mcp-proxy
+      uv run --no-sync mcp-proxy
       --named-server-config ${REGISTRY_PATH:-/app/registries/showcase.json}
+      --host 0.0.0.0
       --port 8080
       --pass-environment
     healthcheck:

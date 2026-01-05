@@ -11,6 +11,7 @@ from pathlib import Path
 
 from fasthtml.common import *
 from monsterui.all import *
+from starlette.responses import Response
 import httpx
 
 # Configure logging
@@ -23,8 +24,9 @@ from components import (
 from scenarios import SCENARIOS, get_scenario_options
 
 # Configuration
+SCRIPT_DIR = Path(__file__).parent
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://localhost:8080")
-REGISTRIES_DIR = Path(os.environ.get("REGISTRIES_DIR", "./registries"))
+REGISTRIES_DIR = Path(os.environ.get("REGISTRIES_DIR", SCRIPT_DIR.parent / "registries"))
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 # FastHTML app setup with dark theme
@@ -299,7 +301,10 @@ async def load_registry_route(registry: str):
         current_registry_path = str(path)
         current_registry = load_registry(current_registry_path)
 
-    return RedirectResponse("/", status_code=303)
+    # Use HX-Redirect header for HTMX to do a client-side redirect
+    response = Response(status_code=200)
+    response.headers["HX-Redirect"] = "/"
+    return response
 
 
 @app.get("/tool/{name}")

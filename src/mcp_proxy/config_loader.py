@@ -148,8 +148,26 @@ def load_registry_from_file(
         if server_config.id not in unique_servers:
             unique_servers[server_config.id] = server_config
             
-        # 2. Resolve Schema
-        input_schema = tool_def.get("inputSchema", {})
+        # 2. Resolve Schema (inherit from source if not specified)
+        input_schema = tool_def.get("inputSchema")
+        source_input_schema = None
+        
+        if source_name:
+            # Get the source tool's schema for inheritance and validation
+            source_tool = tools_by_name[source_name]
+            # Recurse to find the original source's schema
+            while source_tool.get("source"):
+                source_tool = tools_by_name[source_tool["source"]]
+            source_input_schema = source_tool.get("inputSchema", {})
+            
+            # Inherit inputSchema from source if not explicitly defined
+            if input_schema is None:
+                input_schema = source_input_schema.copy() if source_input_schema else {}
+                logger.debug(f"Tool '{name}' inheriting inputSchema from source '{source_name}'")
+        
+        if input_schema is None:
+            input_schema = {}
+            
         if "$ref" in input_schema:
             ref = input_schema["$ref"]
             if ref.startswith("#/schemas/"):
@@ -197,6 +215,24 @@ def load_registry_from_file(
             
             input_schema["properties"] = properties
             input_schema["required"] = required
+
+        # 4. Validate: virtual tool must provide all required fields of source
+        if source_input_schema:
+            source_required = set(source_input_schema.get("required", []))
+            tool_properties = set(input_schema.get("properties", {}).keys())
+            tool_defaults = set(defaults.keys())
+            
+            # Fields the tool provides (either via schema or defaults)
+            provided_fields = tool_properties | tool_defaults
+            missing_required = source_required - provided_fields
+            
+            if missing_required:
+                logger.error(
+                    f"Virtual tool '{name}' is missing required fields from source '{source_name}': "
+                    f"{missing_required}. Either add these to inputSchema or provide defaults. "
+                    f"Disabling this tool."
+                )
+                continue  # Skip this tool, don't add it to virtual_tools
 
         virtual_tools.append(VirtualTool(
             name=name,

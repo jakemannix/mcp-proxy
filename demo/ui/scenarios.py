@@ -25,23 +25,23 @@ SCENARIOS = {
         "prompt": "Create entities for 'Python', 'FastHTML', and 'HTMX'. Then create relations showing that FastHTML uses Python and HTMX. Finally, show all connections.",
         "description": "Tests entity creation, relations, and projection"
     },
-    "time_structured": {
-        "name": "Time (Structured)",
-        "registry": "text-to-structured-demo.json",
-        "prompt": "What time is it in Tokyo right now? Use the what_time_is_it tool to get just the timezone and day of the week.",
-        "description": "Tests JSON-in-text extraction: time server returns JSON in text, virtual tool extracts and projects it"
+    "json_extraction": {
+        "name": "JSON Extraction",
+        "registry": "showcase.json",
+        "prompt": "Use get_time_structured to get the current time in America/Los_Angeles. The raw tool returns JSON inside text - the gateway will extract it into structured output.",
+        "description": "Tests JSON-in-text extraction from mcp-server-time"
     },
-    "timezone_conversion": {
-        "name": "Timezone Conversion",
-        "registry": "text-to-structured-demo.json",
-        "prompt": "If it's 9:00 AM in New York, what time is it in London? Use the convert_timezone_flat tool and show the time difference.",
-        "description": "Tests nested JSON extraction and flattening from convert_time"
+    "day_projection": {
+        "name": "Day Projection",
+        "registry": "showcase.json",
+        "prompt": "Use what_day_is_it with timezone America/New_York to get just the day of the week. This extracts JSON from text AND projects to a single field.",
+        "description": "Tests JSON extraction + field projection"
     },
-    "github_api": {
-        "name": "GitHub API Extraction",
-        "registry": "text-to-structured-demo.json",
-        "prompt": "Fetch information about the modelcontextprotocol/servers repository on GitHub using the get_github_repo tool. Show me the name, description, and star count.",
-        "description": "Tests JSON extraction from fetch server when calling APIs"
+    "timezone_offset": {
+        "name": "Timezone Offset",
+        "registry": "showcase.json",
+        "prompt": "What's the time difference between America/New_York and Asia/Tokyo at 14:00? Use timezone_offset to get a clean summary.",
+        "description": "Tests nested JSON extraction from convert_time"
     }
 }
 

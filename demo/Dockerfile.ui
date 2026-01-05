@@ -6,15 +6,17 @@ WORKDIR /app
 # Install uv for fast Python package management
 RUN pip install uv
 
-# Copy requirements first for caching
-COPY ui/requirements.txt .
-RUN uv pip install --system -r requirements.txt
+# Copy dependency files first (changes rarely)
+COPY ui/pyproject.toml ui/uv.lock ./
 
-# Copy application code
-COPY ui/ .
+# Install dependencies (cached unless deps change)
+RUN uv sync --frozen --no-dev
+
+# Copy application code last (changes frequently)
+COPY ui/main.py ui/components.py ui/scenarios.py ui/style.css ./
 
 # Default port
 EXPOSE 5001
 
 # Run the FastHTML app
-CMD ["python", "main.py"]
+CMD ["uv", "run", "python", "main.py"]

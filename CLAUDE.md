@@ -46,6 +46,7 @@ Deterministic middleware decisions + LLM planning assists:
 | `src/mcp_proxy/mcp_server.py` | Gateway server: multi-backend aggregation |
 | `src/mcp_proxy/proxy_server.py` | Single-backend proxy with tool overrides |
 | `src/mcp_proxy/config_loader.py` | Registry/config parsing, VirtualTool creation |
+| `src/mcp_proxy/json_detector.py` | JSON-in-text detection and extraction |
 | `src/mcp_proxy/output_transformer.py` | JSONPath extraction and outputSchema projection |
 | `src/mcp_proxy/sse_client.py` | SSE client mode (stdio ↔ SSE bridge) |
 | `src/mcp_proxy/streamablehttp_client.py` | Streamable HTTP client mode |
@@ -69,11 +70,36 @@ uv run mcp-proxy http://localhost:8080/sse
 ./demo/test_overrides.sh
 ```
 
+## Demo UI
+
+The demo includes a FastHTML web UI for exploring registries and testing tools.
+
+```bash
+# Docker (recommended) - starts gateway + UI
+cd demo && docker compose up --build
+# Gateway: http://localhost:8080
+# UI: http://localhost:5001
+
+# Local development (live reload)
+./demo/run-demo.sh local
+
+# Or manually:
+uv run mcp-proxy --named-server-config demo/registries/showcase.json --port 8080 &
+uv run python demo/ui/main.py
+```
+
+The `showcase.json` registry demonstrates all gateway features with real MCP servers:
+- **mcp-server-fetch**: Tool renaming (`fetch` → `get_webpage`)
+- **server-memory**: Output projection (JSONPath extraction)
+- **mcp-server-time**: JSON-in-text extraction (text → structuredContent)
+
 ## Git Workflow
 
 **Long-lived development branch**: `mcp-gateway-prototype`
 
 This is the primary development branch for all gateway work. Feature branches should be created from and merged back into this branch. The `main` branch tracks upstream `sparfenyuk/mcp-proxy`.
+
+**IMPORTANT**: Always ask before committing changes. The user may want to test or review changes before they are committed, especially for UI changes or significant functionality.
 
 ```bash
 # Start new feature work
@@ -88,12 +114,16 @@ git merge feature/my-feature
 
 ## Recent Work on `mcp-gateway-prototype`
 
+- **JSON-in-text extraction**: Auto-extracts JSON from text responses into structuredContent
+- **Schema inheritance**: Virtual tools inherit inputSchema from source when not specified
+- **Required field validation**: Virtual tools must provide all required source fields (via schema or defaults)
+- **Demo UI**: FastHTML web interface for registry exploration and tool testing
+- **Docker setup**: Optimized Dockerfiles with layer caching, docker-compose for easy deployment
 - **JSONPath output projection**: `source_field` in outputSchema for field extraction/renaming
 - **Registry PoC**: VirtualTool abstraction with `source` inheritance
 - **Tool overrides**: rename, defaults, hide_fields
 - **MCP server snapshots**: Real-world outputSchema usage analysis (see `demo/mcp-snapshots/`)
-- **Manual testing docs**: `docs/manual-testing.md`
-- **Test rewrites**: All tests updated for new registry API (123 passing)
+- **Test suite**: 187 tests passing
 
 ## Open Work
 
