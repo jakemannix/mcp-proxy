@@ -537,3 +537,132 @@ async def test_call_tool_with_error(
 
         call_tool_result = await session.call_tool("tool", {})
         assert call_tool_result.isError
+
+
+# --- JSON-in-Text Extraction Tests ---
+
+
+@pytest.fixture
+def json_in_text_tool() -> types.Tool:
+    """Tool that returns JSON embedded in text (like mcp-server-time)."""
+    return types.Tool(
+        name="get_time",
+        description="Returns time as JSON in text",
+        inputSchema={"type": "object", "properties": {"timezone": {"type": "string"}}},
+    )
+
+
+@pytest.fixture
+def server_returns_json_in_text(
+    json_in_text_tool: types.Tool,
+) -> Server[object]:
+    """Server that returns JSON embedded in text content (no structuredContent)."""
+    server: Server[object] = Server("json-text-server")
+
+    @server.list_tools()
+    async def _list_tools() -> list[types.Tool]:
+        return [json_in_text_tool]
+
+    @server.call_tool()
+    async def _call_tool(name: str, arguments: dict[str, t.Any]) -> list[types.TextContent]:
+        # Simulate mcp-server-time output: JSON embedded in text
+        json_text = '{\n  "timezone": "America/New_York",\n  "datetime": "2025-12-23T10:00:00-05:00",\n  "day_of_week": "Tuesday",\n  "is_dst": false\n}'
+        return [types.TextContent(type="text", text=json_text)]
+
+    return server
+
+
+async def test_json_extraction_creates_structured_content(
+    server_returns_json_in_text: Server[object],
+) -> None:
+    """Test that JSON in text is extracted and becomes structuredContent.
+
+    This simulates the flow:
+    1. Source tool returns: {"content": [{"type": "text", "text": "{...json...}"}]}
+    2. Virtual tool has output_schema defined
+    3. JSON is extracted from text and set as structuredContent
+    4. Output projection is applied
+    """
+    # Define output schema that projects to subset of fields
+    tool_overrides = {
+        "get_time": {
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "tz": {"type": "string", "source_field": "$.timezone"},
+                    "day": {"type": "string", "source_field": "$.day_of_week"},
+                },
+            },
+        },
+    }
+
+    async with in_memory(server_returns_json_in_text) as session:
+        # Create proxy with overrides
+        proxy_server = await create_proxy_server(session, tool_overrides)
+
+        async with in_memory(proxy_server) as proxy_session:
+            await proxy_session.initialize()
+
+            # Call the tool
+            result = await proxy_session.call_tool("get_time", {"timezone": "America/New_York"})
+
+            # Verify JSON was extracted and projected
+            assert result.structuredContent is not None
+            assert result.structuredContent == {
+                "tz": "America/New_York",
+                "day": "Tuesday",
+            }
+
+
+async def test_json_extraction_without_projection(
+    server_returns_json_in_text: Server[object],
+) -> None:
+    """Test JSON extraction without output projection returns full JSON."""
+    # Output schema without source_field = passthrough
+    tool_overrides = {
+        "get_time": {
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "timezone": {"type": "string"},
+                    "datetime": {"type": "string"},
+                    "day_of_week": {"type": "string"},
+                    "is_dst": {"type": "boolean"},
+                },
+            },
+        },
+    }
+
+    async with in_memory(server_returns_json_in_text) as session:
+        proxy_server = await create_proxy_server(session, tool_overrides)
+
+        async with in_memory(proxy_server) as proxy_session:
+            await proxy_session.initialize()
+
+            result = await proxy_session.call_tool("get_time", {"timezone": "America/New_York"})
+
+            # Verify full JSON was extracted
+            assert result.structuredContent is not None
+            assert result.structuredContent["timezone"] == "America/New_York"
+            assert result.structuredContent["day_of_week"] == "Tuesday"
+            assert result.structuredContent["is_dst"] is False
+
+
+async def test_no_extraction_without_output_schema(
+    server_returns_json_in_text: Server[object],
+) -> None:
+    """Test that without output_schema, no extraction happens."""
+    # No overrides = no extraction
+    async with in_memory(server_returns_json_in_text) as session:
+        proxy_server = await create_proxy_server(session, tool_overrides=None)
+
+        async with in_memory(proxy_server) as proxy_session:
+            await proxy_session.initialize()
+
+            result = await proxy_session.call_tool("get_time", {"timezone": "America/New_York"})
+
+            # Without output_schema, structuredContent should not be set
+            assert result.structuredContent is None
+            # But text content should still be there
+            assert len(result.content) == 1
+            assert result.content[0].type == "text"

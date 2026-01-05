@@ -28,7 +28,13 @@ classifiers = [
 ]
 version = "0.10.0"
 requires-python = ">=3.10"
-dependencies = ["httpx-auth>=0.22.0", "mcp>=1.17.0", "uvicorn>=0.34.0"]
+dependencies = [
+    "a2a-sdk[sqlite]>=0.3.16",
+    "httpx-auth>=0.22.0",
+    "jsonpath-ng>=1.6.0",
+    "mcp>=1.17.0",
+    "uvicorn>=0.34.0",
+]
 
 [build-system]
 requires = ["setuptools"]

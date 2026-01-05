@@ -1,17 +1,23 @@
-"""Tests for the configuration loader module."""
+"""Tests for the configuration loader module.
+
+Tests for load_registry_from_file() with the new registry format:
+{
+    "schemas": { ... },
+    "tools": [
+        {"name": "...", "server": {"command": "...", "args": [...]}, ...}
+    ]
+}
+"""
 
 import json
-import shutil
 import tempfile
 import typing as t
 from collections.abc import Callable, Generator
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
-from mcp.client.stdio import StdioServerParameters
 
-from mcp_proxy.config_loader import load_named_server_configs_from_file
+from mcp_proxy.config_loader import ServerConfig, VirtualTool, load_registry_from_file
 
 
 @pytest.fixture
@@ -37,70 +43,272 @@ def create_temp_config_file() -> Generator[Callable[[dict[str, t.Any]], str], No
             path.unlink()
 
 
-def test_load_valid_config(create_temp_config_file: Callable[[dict[str, t.Any]], str]) -> None:
-    """Test loading a valid configuration file."""
+def test_load_valid_registry(create_temp_config_file: Callable[[dict[str, t.Any]], str]) -> None:
+    """Test loading a valid registry configuration file."""
     config_content = {
-        "mcpServers": {
-            "server1": {
-                "command": "echo",
-                "args": ["hello"],
-                "env": {"FOO": "bar"},
-                "enabled": True,
+        "tools": [
+            {
+                "name": "echo_tool",
+                "description": "Echo a message",
+                "server": {
+                    "command": "echo",
+                    "args": ["hello"],
+                },
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"message": {"type": "string"}},
+                    "required": ["message"],
+                },
             },
-            "server2": {
-                "command": "cat",
-                "args": ["file.txt"],
+            {
+                "name": "cat_tool",
+                "description": "Read a file",
+                "server": {
+                    "command": "cat",
+                    "args": ["file.txt"],
+                },
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                },
             },
-        },
+        ],
     }
     tmp_config_path = create_temp_config_file(config_content)
-    base_env = {"PASSED": "env_value"}
-    base_env_with_added_env = {"PASSED": "env_value", "FOO": "bar"}
 
-    loaded_params = load_named_server_configs_from_file(tmp_config_path, base_env)
+    servers, tools = load_registry_from_file(tmp_config_path, {})
 
-    assert "server1" in loaded_params
-    assert loaded_params["server1"].command == "echo"
-    assert loaded_params["server1"].args == ["hello"]
-    assert (
-        loaded_params["server1"].env == base_env_with_added_env
-    )  # Env is a copy, check if it contains base_env items
+    # Should have 2 unique servers (different commands)
+    assert len(servers) == 2
 
-    assert "server2" in loaded_params
-    assert loaded_params["server2"].command == "cat"
-    assert loaded_params["server2"].args == ["file.txt"]
-    assert loaded_params["server2"].env == base_env
+    # Should have 2 tools
+    assert len(tools) == 2
+
+    tool_names = [t.name for t in tools]
+    assert "echo_tool" in tool_names
+    assert "cat_tool" in tool_names
+
+    echo_tool = next(t for t in tools if t.name == "echo_tool")
+    assert echo_tool.description == "Echo a message"
+    assert "message" in echo_tool.input_schema["properties"]
 
 
-def test_load_config_with_not_enabled_server(
+def test_load_registry_with_shared_server(
     create_temp_config_file: Callable[[dict[str, t.Any]], str],
 ) -> None:
-    """Test loading a configuration with disabled servers."""
+    """Test that tools sharing the same server config get deduplicated."""
     config_content = {
-        "mcpServers": {
-            "explicitly_enabled_server": {"command": "true_command", "enabled": True},
-            # No 'enabled' flag, defaults to True
-            "implicitly_enabled_server": {"command": "another_true_command"},
-            "not_enabled_server": {"command": "false_command", "enabled": False},
-        },
+        "tools": [
+            {
+                "name": "tool1",
+                "server": {"command": "myserver", "args": ["--mode", "a"]},
+                "inputSchema": {"type": "object"},
+            },
+            {
+                "name": "tool2",
+                "server": {"command": "myserver", "args": ["--mode", "a"]},  # Same server
+                "inputSchema": {"type": "object"},
+            },
+        ],
     }
     tmp_config_path = create_temp_config_file(config_content)
-    loaded_params = load_named_server_configs_from_file(tmp_config_path, {})
 
-    assert "explicitly_enabled_server" in loaded_params
-    assert loaded_params["explicitly_enabled_server"].command == "true_command"
-    assert "implicitly_enabled_server" in loaded_params
-    assert loaded_params["implicitly_enabled_server"].command == "another_true_command"
-    assert "not_enabled_server" not in loaded_params
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # Both tools use the same server config, so only 1 unique server
+    assert len(servers) == 1
+    assert len(tools) == 2
+
+    # Both tools should reference the same server_id
+    assert tools[0].server_id == tools[1].server_id
+
+
+def test_load_registry_with_source_inheritance(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that tools can inherit server config via 'source' field."""
+    config_content = {
+        "tools": [
+            {
+                "name": "base_tool",
+                "description": "Base tool",
+                "server": {"command": "myserver", "args": ["--base"]},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"x": {"type": "string"}},
+                },
+            },
+            {
+                "name": "derived_tool",
+                "description": "Derived tool using source",
+                "source": "base_tool",  # Inherit server from base_tool
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"y": {"type": "string"}},
+                },
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # Only 1 unique server (derived inherits from base)
+    assert len(servers) == 1
+    assert len(tools) == 2
+
+    base_tool = next(t for t in tools if t.name == "base_tool")
+    derived_tool = next(t for t in tools if t.name == "derived_tool")
+
+    # Both should have the same server_id
+    assert base_tool.server_id == derived_tool.server_id
+
+    # derived_tool should have original_name set to "base_tool"
+    assert derived_tool.original_name == "base_tool"
+
+
+def test_load_registry_with_defaults(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that defaults are applied and fields are hidden from schema."""
+    config_content = {
+        "tools": [
+            {
+                "name": "api_tool",
+                "server": {"command": "api-client"},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "api_key": {"type": "string"},
+                    },
+                    "required": ["query", "api_key"],
+                },
+                "defaults": {
+                    "api_key": "secret123",
+                },
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    assert len(tools) == 1
+    tool = tools[0]
+
+    # api_key should be removed from properties (hidden by default)
+    assert "api_key" not in tool.input_schema["properties"]
+    assert "query" in tool.input_schema["properties"]
+
+    # api_key should be removed from required
+    assert "api_key" not in tool.input_schema["required"]
+    assert "query" in tool.input_schema["required"]
+
+    # defaults should be stored
+    assert tool.defaults == {"api_key": "secret123"}
+
+
+def test_load_registry_with_schema_ref(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that $ref to schemas are resolved."""
+    config_content = {
+        "schemas": {
+            "QueryInput": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "limit": {"type": "integer"},
+                },
+                "required": ["query"],
+            },
+        },
+        "tools": [
+            {
+                "name": "search_tool",
+                "server": {"command": "search"},
+                "inputSchema": {"$ref": "#/schemas/QueryInput"},
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    assert len(tools) == 1
+    tool = tools[0]
+
+    # Schema should be resolved from $ref
+    assert tool.input_schema["type"] == "object"
+    assert "query" in tool.input_schema["properties"]
+    assert "limit" in tool.input_schema["properties"]
+
+
+def test_load_registry_with_url_server(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test loading a tool with URL-based server (SSE/HTTP transport)."""
+    config_content = {
+        "tools": [
+            {
+                "name": "remote_tool",
+                "server": {
+                    "url": "http://localhost:8080/mcp",
+                    "transport": "streamablehttp",
+                },
+                "inputSchema": {"type": "object"},
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    assert len(servers) == 1
+    server = list(servers.values())[0]
+
+    assert server.url == "http://localhost:8080/mcp"
+    assert server.transport == "streamablehttp"
+    assert server.command is None
+
+
+def test_load_registry_with_env(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test loading a tool with environment variables."""
+    config_content = {
+        "tools": [
+            {
+                "name": "env_tool",
+                "server": {
+                    "command": "my-tool",
+                    "env": {"API_KEY": "secret", "DEBUG": "true"},
+                },
+                "inputSchema": {"type": "object"},
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    assert len(servers) == 1
+    server = list(servers.values())[0]
+
+    # env should be stored as tuple of tuples (sorted)
+    env_dict = dict(server.env)
+    assert env_dict["API_KEY"] == "secret"
+    assert env_dict["DEBUG"] == "true"
 
 
 def test_file_not_found() -> None:
     """Test handling of non-existent configuration files."""
-    with pytest.raises(FileNotFoundError):
-        load_named_server_configs_from_file("non_existent_file.json", {})
+    with pytest.raises(ValueError, match="Could not read registry file"):
+        load_registry_from_file("non_existent_file.json", {})
 
 
-def test_json_decode_error() -> None:
+def test_json_decode_error(create_temp_config_file: Callable[[dict[str, t.Any]], str]) -> None:
     """Test handling of invalid JSON in configuration files."""
     # Create a file with invalid JSON content
     with tempfile.NamedTemporaryFile(
@@ -111,139 +319,310 @@ def test_json_decode_error() -> None:
         tmp_config.write("this is not json {")
         tmp_config_path = tmp_config.name
 
-    # Use try/finally to ensure cleanup
     try:
-        with pytest.raises(json.JSONDecodeError):
-            load_named_server_configs_from_file(tmp_config_path, {})
+        with pytest.raises(ValueError, match="Could not read registry file"):
+            load_registry_from_file(tmp_config_path, {})
     finally:
         path = Path(tmp_config_path)
         if path.exists():
             path.unlink()
 
 
-def test_load_example_fetch_config_if_uvx_exists() -> None:
-    """Test loading the example fetch configuration if uvx is available."""
-    if not shutil.which("uvx"):
-        pytest.skip("uvx command not found in PATH, skipping test for example config.")
-
-    # Assuming the test is run from the root of the repository
-    example_config_path = Path(__file__).parent.parent / "config_example.json"
-
-    if not example_config_path.exists():
-        pytest.fail(
-            f"Example config file not found at expected path: {example_config_path}",
-        )
-
-    base_env = {"EXAMPLE_ENV": "true"}
-    loaded_params = load_named_server_configs_from_file(example_config_path, base_env)
-
-    assert "fetch" in loaded_params
-    fetch_param = loaded_params["fetch"]
-    assert isinstance(fetch_param, StdioServerParameters)
-    assert fetch_param.command == "uvx"
-    assert fetch_param.args == ["mcp-server-fetch"]
-    assert fetch_param.env == base_env
-    # The 'timeout' and 'transportType' fields from the config are currently ignored by the loader,
-    # so no need to assert them on StdioServerParameters.
-
-
-def test_invalid_config_format_missing_mcpservers(
+def test_tool_missing_server_and_source(
     create_temp_config_file: Callable[[dict[str, t.Any]], str],
 ) -> None:
-    """Test handling of configuration files missing the mcpServers key."""
-    config_content = {"some_other_key": "value"}
-    tmp_config_path = create_temp_config_file(config_content)
-
-    with pytest.raises(ValueError, match="Missing 'mcpServers' key"):
-        load_named_server_configs_from_file(tmp_config_path, {})
-
-
-@patch("mcp_proxy.config_loader.logger")
-def test_invalid_server_entry_not_dict(
-    mock_logger: Mock,
-    create_temp_config_file: Callable[[dict[str, t.Any]], str],
-) -> None:
-    """Test handling of server entries that are not dictionaries."""
-    config_content = {"mcpServers": {"server1": "not_a_dict"}}
-    tmp_config_path = create_temp_config_file(config_content)
-
-    loaded_params = load_named_server_configs_from_file(tmp_config_path, {})
-    assert len(loaded_params) == 0  # No servers should be loaded
-    mock_logger.warning.assert_called_with(
-        "Skipping invalid server config for '%s' in %s. Entry is not a dictionary.",
-        "server1",
-        tmp_config_path,
-    )
-
-
-@patch("mcp_proxy.config_loader.logger")
-def test_server_entry_missing_command(
-    mock_logger: Mock,
-    create_temp_config_file: Callable[[dict[str, t.Any]], str],
-) -> None:
-    """Test handling of server entries missing the command field."""
-    config_content = {"mcpServers": {"server_no_command": {"args": ["arg1"]}}}
-    tmp_config_path = create_temp_config_file(config_content)
-    loaded_params = load_named_server_configs_from_file(tmp_config_path, {})
-    assert "server_no_command" not in loaded_params
-    mock_logger.warning.assert_called_with(
-        "Named server '%s' from config is missing 'command'. Skipping.",
-        "server_no_command",
-    )
-
-
-@patch("mcp_proxy.config_loader.logger")
-def test_server_entry_invalid_args_type(
-    mock_logger: Mock,
-    create_temp_config_file: Callable[[dict[str, t.Any]], str],
-) -> None:
-    """Test handling of server entries with invalid args type."""
+    """Test that tools without server or source raise an error."""
     config_content = {
-        "mcpServers": {
-            "server_invalid_args": {"command": "mycmd", "args": "not_a_list"},
-        },
+        "tools": [
+            {
+                "name": "orphan_tool",
+                "inputSchema": {"type": "object"},
+                # No server, no source
+            },
+        ],
     }
     tmp_config_path = create_temp_config_file(config_content)
-    loaded_params = load_named_server_configs_from_file(tmp_config_path, {})
-    assert "server_invalid_args" not in loaded_params
-    mock_logger.warning.assert_called_with(
-        "Named server '%s' from config has invalid 'args' (must be a list). Skipping.",
-        "server_invalid_args",
-    )
+
+    with pytest.raises(ValueError, match="has no server configuration"):
+        load_registry_from_file(tmp_config_path, {})
 
 
-def test_empty_mcpservers_dict(create_temp_config_file: Callable[[dict[str, t.Any]], str]) -> None:
-    """Test handling of configuration files with empty mcpServers dictionary."""
-    config_content: dict[str, t.Any] = {"mcpServers": {}}
-    tmp_config_path = create_temp_config_file(config_content)
-    loaded_params = load_named_server_configs_from_file(tmp_config_path, {})
-    assert len(loaded_params) == 0
-
-
-def test_config_file_is_empty_json_object(
+def test_tool_with_invalid_source(
     create_temp_config_file: Callable[[dict[str, t.Any]], str],
 ) -> None:
-    """Test handling of configuration files with empty JSON objects."""
-    config_content: dict[str, t.Any] = {}  # Empty JSON object
+    """Test that referencing an unknown source raises an error."""
+    config_content = {
+        "tools": [
+            {
+                "name": "bad_tool",
+                "source": "nonexistent_tool",
+                "inputSchema": {"type": "object"},
+            },
+        ],
+    }
     tmp_config_path = create_temp_config_file(config_content)
-    with pytest.raises(ValueError, match="Missing 'mcpServers' key"):
-        load_named_server_configs_from_file(tmp_config_path, {})
+
+    with pytest.raises(ValueError, match="references unknown source"):
+        load_registry_from_file(tmp_config_path, {})
 
 
-def test_config_file_is_empty_string() -> None:
-    """Test handling of configuration files with empty content."""
-    # Create a file with an empty string
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        delete=False,
-        suffix=".json",
-    ) as tmp_config:
-        tmp_config.write("")  # Empty content
-        tmp_config_path = tmp_config.name
-    try:
-        with pytest.raises(json.JSONDecodeError):
-            load_named_server_configs_from_file(tmp_config_path, {})
-    finally:
-        path = Path(tmp_config_path)
-        if path.exists():
-            path.unlink()
+def test_empty_tools_list(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test handling of configuration with empty tools list."""
+    config_content: dict[str, t.Any] = {"tools": []}
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    assert len(servers) == 0
+    assert len(tools) == 0
+
+
+def test_empty_config_file(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test handling of configuration with empty JSON object."""
+    config_content: dict[str, t.Any] = {}
+    tmp_config_path = create_temp_config_file(config_content)
+
+    # Empty config should work (no tools = empty lists)
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    assert len(servers) == 0
+    assert len(tools) == 0
+
+
+def test_server_config_id_uniqueness() -> None:
+    """Test that ServerConfig generates unique IDs for different configs."""
+    config1 = ServerConfig(command="echo", args=("hello",))
+    config2 = ServerConfig(command="echo", args=("world",))
+    config3 = ServerConfig(command="echo", args=("hello",))
+
+    # Different args should have different IDs
+    assert config1.id != config2.id
+
+    # Same config should have same ID
+    assert config1.id == config3.id
+
+
+def test_virtual_tool_dataclass() -> None:
+    """Test VirtualTool dataclass creation."""
+    tool = VirtualTool(
+        name="test_tool",
+        description="A test tool",
+        input_schema={"type": "object"},
+        server_id="abc123",
+        original_name="original",
+        defaults={"key": "value"},
+    )
+
+    assert tool.name == "test_tool"
+    assert tool.description == "A test tool"
+    assert tool.server_id == "abc123"
+    assert tool.original_name == "original"
+    assert tool.defaults == {"key": "value"}
+
+
+def test_chained_source_inheritance(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that source inheritance works through multiple levels."""
+    config_content = {
+        "tools": [
+            {
+                "name": "base",
+                "server": {"command": "myserver"},
+                "inputSchema": {"type": "object"},
+            },
+            {
+                "name": "level1",
+                "source": "base",
+                "inputSchema": {"type": "object"},
+            },
+            {
+                "name": "level2",
+                "source": "level1",  # Inherits from level1, which inherits from base
+                "inputSchema": {"type": "object"},
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # All tools should share the same server
+    assert len(servers) == 1
+
+    # All tools should have the same server_id
+    server_ids = {t.server_id for t in tools}
+    assert len(server_ids) == 1
+
+
+def test_chained_source_original_name_resolution(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that original_name follows the source chain to find the backend tool name."""
+    config_content = {
+        "tools": [
+            {
+                "name": "backend_tool",
+                "server": {"url": "http://api.example.com/mcp", "transport": "streamablehttp"},
+                "inputSchema": {"type": "object"},
+                "originalName": "actual_backend_name",  # The real name on the backend
+            },
+            {
+                "name": "alias_tool",
+                "source": "backend_tool",  # References backend_tool
+                "inputSchema": {"type": "object"},
+            },
+            {
+                "name": "virtual_tool",
+                "source": "alias_tool",  # References alias_tool which references backend_tool
+                "inputSchema": {"type": "object"},
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # Find each tool
+    backend_tool = next(t for t in tools if t.name == "backend_tool")
+    alias_tool = next(t for t in tools if t.name == "alias_tool")
+    virtual_tool = next(t for t in tools if t.name == "virtual_tool")
+
+    # All should resolve to the same originalName from the chain
+    assert backend_tool.original_name == "actual_backend_name"
+    assert alias_tool.original_name == "actual_backend_name"
+    assert virtual_tool.original_name == "actual_backend_name"
+
+
+def test_virtual_tool_inherits_input_schema(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that virtual tools inherit inputSchema from source when not specified."""
+    config_content = {
+        "tools": [
+            {
+                "name": "source_tool",
+                "server": {"command": "myserver"},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "timezone": {"type": "string"},
+                        "format": {"type": "string"},
+                    },
+                    "required": ["timezone"],
+                },
+            },
+            {
+                "name": "virtual_tool",
+                "source": "source_tool",
+                # No inputSchema - should inherit from source
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    assert len(tools) == 2
+    virtual_tool = next(t for t in tools if t.name == "virtual_tool")
+
+    # Should have inherited the schema
+    assert virtual_tool.input_schema["type"] == "object"
+    assert "timezone" in virtual_tool.input_schema["properties"]
+    assert "format" in virtual_tool.input_schema["properties"]
+    assert "timezone" in virtual_tool.input_schema["required"]
+
+
+def test_virtual_tool_missing_required_fields_disabled(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that virtual tools missing required source fields are disabled."""
+    config_content = {
+        "tools": [
+            {
+                "name": "source_tool",
+                "server": {"command": "myserver"},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "required_field": {"type": "string"},
+                        "optional_field": {"type": "string"},
+                    },
+                    "required": ["required_field"],
+                },
+            },
+            {
+                "name": "bad_virtual_tool",
+                "source": "source_tool",
+                # Custom schema that's missing the required field
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "optional_field": {"type": "string"},
+                    },
+                },
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # Only the source tool should be loaded - virtual tool should be disabled
+    assert len(tools) == 1
+    assert tools[0].name == "source_tool"
+
+    # Should have logged an error
+    assert "missing required fields" in caplog.text.lower()
+    assert "bad_virtual_tool" in caplog.text
+
+
+def test_virtual_tool_required_fields_via_defaults(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that virtual tools can satisfy required fields via defaults."""
+    config_content = {
+        "tools": [
+            {
+                "name": "source_tool",
+                "server": {"command": "myserver"},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "api_key": {"type": "string"},
+                        "query": {"type": "string"},
+                    },
+                    "required": ["api_key", "query"],
+                },
+            },
+            {
+                "name": "simplified_tool",
+                "source": "source_tool",
+                "defaults": {"api_key": "hardcoded_key"},
+                # Only exposes query - api_key is satisfied by default
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # Both tools should be loaded
+    assert len(tools) == 2
+    simplified = next(t for t in tools if t.name == "simplified_tool")
+    
+    # api_key is hidden, only query exposed
+    assert "api_key" not in simplified.input_schema.get("properties", {})
+    assert "query" in simplified.input_schema["properties"]

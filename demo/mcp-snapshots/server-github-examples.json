@@ -1,0 +1,228 @@
+{
+  "server": "github-mcp-server",
+  "version": "0.6.2",
+  "tools": {
+    "search_repositories": {
+      "description": "Search for GitHub repositories",
+      "has_output_schema": false,
+      "example_input": {
+        "query": "mcp server language:python",
+        "perPage": 5
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Found 5 repositories:\n\n1. **anthropics/mcp-python** (★ 2,341)\n   Official Python SDK for Model Context Protocol\n   https://github.com/anthropics/mcp-python\n\n2. **modelcontextprotocol/servers** (★ 1,892)\n   Reference MCP server implementations\n   https://github.com/modelcontextprotocol/servers\n\n3. **example/mcp-weather** (★ 456)\n   Weather data MCP server\n   https://github.com/example/mcp-weather\n\n4. **user/mcp-database** (★ 234)\n   Database query MCP server\n   https://github.com/user/mcp-database\n\n5. **org/mcp-tools** (★ 189)\n   Collection of MCP tools\n   https://github.com/org/mcp-tools"
+          }
+        ]
+      }
+    },
+    "get_file_contents": {
+      "description": "Get the contents of a file or directory from a GitHub repository",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "anthropics",
+        "repo": "mcp-python",
+        "path": "README.md",
+        "branch": "main"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "# MCP Python SDK\n\nOfficial Python SDK for the Model Context Protocol.\n\n## Installation\n\n```bash\npip install mcp\n```\n\n## Quick Start\n\n```python\nfrom mcp import Server\n\nserver = Server(\"my-server\")\n\n@server.tool()\nasync def hello(name: str) -> str:\n    return f\"Hello, {name}!\"\n```"
+          }
+        ]
+      }
+    },
+    "create_issue": {
+      "description": "Create a new issue in a GitHub repository",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "anthropics",
+        "repo": "mcp-python",
+        "title": "Add support for streaming responses",
+        "body": "## Description\n\nIt would be great to have built-in support for streaming responses.\n\n## Use Case\n\nLong-running tools that produce incremental output.",
+        "labels": ["enhancement", "feature-request"]
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Created issue #42: \"Add support for streaming responses\"\n\nURL: https://github.com/anthropics/mcp-python/issues/42\nState: open\nLabels: enhancement, feature-request\nCreated: 2024-01-15T10:30:00Z"
+          }
+        ]
+      }
+    },
+    "get_issue": {
+      "description": "Get details of a specific issue in a GitHub repository",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "anthropics",
+        "repo": "mcp-python",
+        "issue_number": 42
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Issue #42: Add support for streaming responses\n\nState: open\nAuthor: jdoe\nCreated: 2024-01-15T10:30:00Z\nUpdated: 2024-01-16T14:22:00Z\nLabels: enhancement, feature-request\nAssignees: contributor1\n\n## Description\n\nIt would be great to have built-in support for streaming responses.\n\n## Use Case\n\nLong-running tools that produce incremental output.\n\n---\n\nComments: 3\nURL: https://github.com/anthropics/mcp-python/issues/42"
+          }
+        ]
+      }
+    },
+    "list_issues": {
+      "description": "List issues in a GitHub repository with filtering options",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "anthropics",
+        "repo": "mcp-python",
+        "state": "open",
+        "labels": ["bug"],
+        "per_page": 3
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Found 3 open issues with label 'bug':\n\n#38: Connection timeout on slow networks\n    Labels: bug, networking\n    Created: 2024-01-10\n\n#35: Memory leak in long-running servers\n    Labels: bug, performance\n    Created: 2024-01-08\n\n#31: Incorrect error message for invalid schemas\n    Labels: bug, documentation\n    Created: 2024-01-05"
+          }
+        ]
+      }
+    },
+    "create_pull_request": {
+      "description": "Create a new pull request in a GitHub repository",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "anthropics",
+        "repo": "mcp-python",
+        "title": "Add streaming response support",
+        "body": "## Summary\n\nImplements streaming responses for long-running tools.\n\nFixes #42",
+        "head": "feature/streaming",
+        "base": "main",
+        "draft": false
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Created pull request #45: \"Add streaming response support\"\n\nURL: https://github.com/anthropics/mcp-python/pull/45\nState: open\nHead: feature/streaming\nBase: main\nCreated: 2024-01-17T09:00:00Z\n\nChecks: pending"
+          }
+        ]
+      }
+    },
+    "get_pull_request": {
+      "description": "Get details of a specific pull request",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "anthropics",
+        "repo": "mcp-python",
+        "pull_number": 45
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Pull Request #45: Add streaming response support\n\nState: open\nAuthor: contributor1\nHead: feature/streaming → Base: main\nCreated: 2024-01-17T09:00:00Z\nUpdated: 2024-01-17T14:30:00Z\n\nMergeable: true\nChecks: 3 passed, 0 failed\nReviews: 1 approved, 0 changes requested\n\n## Summary\n\nImplements streaming responses for long-running tools.\n\nFixes #42\n\n---\n\nFiles changed: 5\n+234 / -12 lines\nURL: https://github.com/anthropics/mcp-python/pull/45"
+          }
+        ]
+      }
+    },
+    "list_commits": {
+      "description": "Get list of commits of a branch in a GitHub repository",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "anthropics",
+        "repo": "mcp-python",
+        "sha": "main",
+        "perPage": 5
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Recent commits on main:\n\nabc1234 - Add streaming response support (contributor1, 2 hours ago)\nfed5678 - Fix memory leak in server loop (jdoe, 1 day ago)\n789def0 - Update documentation for v1.2.0 (docs-bot, 2 days ago)\n012abc3 - Bump version to 1.2.0 (release-bot, 2 days ago)\n345def6 - Add retry logic for transient failures (contributor2, 3 days ago)"
+          }
+        ]
+      }
+    },
+    "search_code": {
+      "description": "Search for code across GitHub repositories",
+      "has_output_schema": false,
+      "example_input": {
+        "q": "outputSchema language:python repo:modelcontextprotocol/servers",
+        "per_page": 3
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Found 3 code matches:\n\n1. modelcontextprotocol/servers/src/filesystem/server.py\n   Line 45: \"outputSchema\": {\"type\": \"object\", ...\n\n2. modelcontextprotocol/servers/src/memory/tools.py\n   Line 23: output_schema = {\"type\": \"object\", \"properties\": ...\n\n3. modelcontextprotocol/servers/tests/test_schemas.py\n   Line 112: assert \"outputSchema\" in tool_definition"
+          }
+        ]
+      }
+    },
+    "create_or_update_file": {
+      "description": "Create or update a single file in a GitHub repository",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "myorg",
+        "repo": "myproject",
+        "path": "docs/API.md",
+        "content": "# API Documentation\n\n## Endpoints\n\n...",
+        "message": "Add API documentation",
+        "branch": "main"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Created file docs/API.md\n\nCommit: def4567\nMessage: Add API documentation\nBranch: main\nURL: https://github.com/myorg/myproject/blob/main/docs/API.md"
+          }
+        ]
+      }
+    },
+    "push_files": {
+      "description": "Push multiple files to a GitHub repository in a single commit",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "myorg",
+        "repo": "myproject",
+        "branch": "main",
+        "files": [
+          {"path": "src/new_feature.py", "content": "def new_feature():\n    pass"},
+          {"path": "tests/test_new_feature.py", "content": "def test_new_feature():\n    assert True"}
+        ],
+        "message": "Add new feature with tests"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Pushed 2 files to main\n\nCommit: abc7890\nMessage: Add new feature with tests\n\nFiles:\n  - src/new_feature.py (created)\n  - tests/test_new_feature.py (created)\n\nURL: https://github.com/myorg/myproject/commit/abc7890"
+          }
+        ]
+      }
+    },
+    "merge_pull_request": {
+      "description": "Merge a pull request",
+      "has_output_schema": false,
+      "example_input": {
+        "owner": "anthropics",
+        "repo": "mcp-python",
+        "pull_number": 45,
+        "merge_method": "squash",
+        "commit_title": "Add streaming response support (#45)"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Merged pull request #45\n\nMethod: squash\nCommit: ghi2345\nMessage: Add streaming response support (#45)\n\nBranch feature/streaming has been merged into main."
+          }
+        ]
+      }
+    }
+  }
+}

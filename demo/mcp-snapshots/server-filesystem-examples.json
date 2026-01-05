@@ -1,0 +1,231 @@
+{
+  "server": "secure-filesystem-server",
+  "version": "0.2.0",
+  "tools": {
+    "read_file": {
+      "description": "Read the complete contents of a file as text. DEPRECATED: Use read_text_file instead.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp/config.json",
+        "head": 20
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Read 20 lines from /tmp/config.json"}
+        ],
+        "structuredContent": {
+          "content": "{\n  \"name\": \"my-app\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n    \"express\": \"^4.18.0\"\n  }\n}"
+        }
+      }
+    },
+    "read_text_file": {
+      "description": "Read the complete contents of a file from the file system as text.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp/notes.txt"
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Successfully read /tmp/notes.txt"}
+        ],
+        "structuredContent": {
+          "content": "Meeting notes from 2024-01-15:\n- Discussed project timeline\n- Assigned tasks to team members\n- Next meeting scheduled for Friday"
+        }
+      }
+    },
+    "read_media_file": {
+      "description": "Read an image or audio file. Returns the base64 encoded data and MIME type.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp/logo.png"
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Read media file /tmp/logo.png"}
+        ],
+        "structuredContent": {
+          "content": [
+            {
+              "type": "image",
+              "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+              "mimeType": "image/png"
+            }
+          ]
+        }
+      }
+    },
+    "read_multiple_files": {
+      "description": "Read the contents of multiple files simultaneously.",
+      "has_output_schema": true,
+      "example_input": {
+        "paths": ["/tmp/file1.txt", "/tmp/file2.txt"]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Read 2 files"}
+        ],
+        "structuredContent": {
+          "content": "/tmp/file1.txt:\nContents of first file\n\n---\n\n/tmp/file2.txt:\nContents of second file"
+        }
+      }
+    },
+    "write_file": {
+      "description": "Create a new file or completely overwrite an existing file with new content.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp/output.txt",
+        "content": "Hello, World!\nThis is a test file."
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "File written successfully"}
+        ],
+        "structuredContent": {
+          "content": "Successfully wrote 35 bytes to /tmp/output.txt"
+        }
+      }
+    },
+    "edit_file": {
+      "description": "Make line-based edits to a text file. Returns a git-style diff.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp/config.json",
+        "edits": [
+          {"oldText": "\"version\": \"1.0.0\"", "newText": "\"version\": \"1.1.0\""}
+        ],
+        "dryRun": false
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Applied 1 edit to /tmp/config.json"}
+        ],
+        "structuredContent": {
+          "content": "--- /tmp/config.json\n+++ /tmp/config.json\n@@ -1,3 +1,3 @@\n {\n-  \"version\": \"1.0.0\"\n+  \"version\": \"1.1.0\"\n }"
+        }
+      }
+    },
+    "create_directory": {
+      "description": "Create a new directory or ensure a directory exists.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp/new_project/src"
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Directory created"}
+        ],
+        "structuredContent": {
+          "content": "Created directory /tmp/new_project/src"
+        }
+      }
+    },
+    "list_directory": {
+      "description": "Get a detailed listing of all files and directories in a specified path.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp"
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Listed /tmp"}
+        ],
+        "structuredContent": {
+          "content": "[DIR] new_project\n[DIR] cache\n[FILE] config.json\n[FILE] notes.txt\n[FILE] logo.png"
+        }
+      }
+    },
+    "list_directory_with_sizes": {
+      "description": "Get a detailed listing including sizes.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp",
+        "sortBy": "size"
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Listed /tmp with sizes"}
+        ],
+        "structuredContent": {
+          "content": "[FILE] logo.png (15.2 KB)\n[FILE] config.json (256 B)\n[FILE] notes.txt (128 B)\n[DIR] new_project\n[DIR] cache"
+        }
+      }
+    },
+    "directory_tree": {
+      "description": "Get a recursive tree view of files and directories as a JSON structure.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp/new_project",
+        "excludePatterns": ["node_modules", ".git"]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Generated tree for /tmp/new_project"}
+        ],
+        "structuredContent": {
+          "content": "{\n  \"name\": \"new_project\",\n  \"type\": \"directory\",\n  \"children\": [\n    {\"name\": \"src\", \"type\": \"directory\", \"children\": []},\n    {\"name\": \"README.md\", \"type\": \"file\"}\n  ]\n}"
+        }
+      }
+    },
+    "move_file": {
+      "description": "Move or rename files and directories.",
+      "has_output_schema": true,
+      "example_input": {
+        "source": "/tmp/old_name.txt",
+        "destination": "/tmp/new_name.txt"
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "File moved"}
+        ],
+        "structuredContent": {
+          "content": "Moved /tmp/old_name.txt to /tmp/new_name.txt"
+        }
+      }
+    },
+    "search_files": {
+      "description": "Recursively search for files and directories matching a pattern.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp",
+        "pattern": "**/*.json",
+        "excludePatterns": ["node_modules"]
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Found 2 matches"}
+        ],
+        "structuredContent": {
+          "content": "/tmp/config.json\n/tmp/new_project/package.json"
+        }
+      }
+    },
+    "get_file_info": {
+      "description": "Retrieve detailed metadata about a file or directory.",
+      "has_output_schema": true,
+      "example_input": {
+        "path": "/tmp/config.json"
+      },
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "File info for /tmp/config.json"}
+        ],
+        "structuredContent": {
+          "content": "Path: /tmp/config.json\nType: file\nSize: 256 bytes\nCreated: 2024-01-15T10:30:00Z\nModified: 2024-01-15T14:22:00Z\nPermissions: rw-r--r--"
+        }
+      }
+    },
+    "list_allowed_directories": {
+      "description": "Returns the list of directories that this server is allowed to access.",
+      "has_output_schema": true,
+      "example_input": {},
+      "example_output": {
+        "content": [
+          {"type": "text", "text": "Allowed directories"}
+        ],
+        "structuredContent": {
+          "content": "/tmp\n/home/user/documents"
+        }
+      }
+    }
+  }
+}

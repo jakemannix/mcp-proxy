@@ -1,0 +1,298 @@
+{
+    "schemas": {
+        "Echo": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "text"
+            ]
+        },
+        "Calculate": {
+            "type": "object",
+            "properties": {
+                "operation": {
+                    "type": "string",
+                    "enum": [
+                        "add",
+                        "subtract",
+                        "multiply",
+                        "divide"
+                    ]
+                },
+                "a": {
+                    "type": "number"
+                },
+                "b": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "operation",
+                "a",
+                "b"
+            ]
+        },
+        "Fetch": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "url"
+            ]
+        },
+        "DuckDuckGoSearch": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "query"
+            ]
+        },
+        "ReadFile": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "path"
+            ]
+        },
+        "CreateEntities": {
+            "type": "object",
+            "properties": {
+                "entities": {
+                    "type": "array"
+                }
+            }
+        },
+        "CreateRelations": {
+            "type": "object"
+        },
+        "AddObservations": {
+            "type": "object"
+        },
+        "ReadGraph": {
+            "type": "object"
+        },
+        "SearchNodes": {
+            "type": "object"
+        },
+        "OpenNodes": {
+            "type": "object"
+        }
+    },
+    "tools": [
+        {
+            "name": "echo",
+            "description": "Echo back the input",
+            "inputSchema": {
+                "$ref": "#/schemas/Echo"
+            },
+            "server": {
+                "command": "python",
+                "args": [
+                    "../agent_playground/tools/example_mcp_server.py"
+                ]
+            }
+        },
+        {
+            "name": "calculate",
+            "description": "Perform a calculation",
+            "inputSchema": {
+                "$ref": "#/schemas/Calculate"
+            },
+            "server": {
+                "command": "python",
+                "args": [
+                    "../agent_playground/tools/example_mcp_server.py"
+                ]
+            }
+        },
+        {
+            "name": "fetch",
+            "description": "Fetch content from a URL",
+            "inputSchema": {
+                "$ref": "#/schemas/Fetch"
+            },
+            "server": {
+                "command": "uvx",
+                "args": [
+                    "mcp-server-fetch"
+                ]
+            }
+        },
+        {
+            "name": "duckduckgo_web_search",
+            "description": "Search the web using DuckDuckGo",
+            "inputSchema": {
+                "$ref": "#/schemas/DuckDuckGoSearch"
+            },
+            "server": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "duckduckgo-mcp-server"
+                ]
+            }
+        },
+        {
+            "name": "read_file",
+            "description": "Read a file from the filesystem",
+            "inputSchema": {
+                "$ref": "#/schemas/ReadFile"
+            },
+            "server": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    "/Users/jake/src/open_src/agent_playground"
+                ]
+            }
+        },
+        {
+            "name": "create_entities",
+            "description": "Raw tool to create entities",
+            "inputSchema": {
+                "$ref": "#/schemas/CreateEntities"
+            },
+            "server": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-memory"
+                ]
+            }
+        },
+        {
+            "name": "remember_entities",
+            "source": "create_entities",
+            "description": "Store new entities (people, places, concepts) in your memory graph for long-term recall.",
+            "inputSchema": {
+                "$ref": "#/schemas/CreateEntities"
+            }
+        },
+        {
+            "name": "create_relations",
+            "description": "Raw tool to create relations",
+            "inputSchema": {
+                "$ref": "#/schemas/CreateRelations"
+            },
+            "server": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-memory"
+                ]
+            }
+        },
+        {
+            "name": "connect_entities",
+            "source": "create_relations",
+            "description": "Create a relationship between two existing entities in your memory to understand how they are connected.",
+            "inputSchema": {
+                "$ref": "#/schemas/CreateRelations"
+            }
+        },
+        {
+            "name": "add_observations",
+            "description": "Raw tool to add observations",
+            "inputSchema": {
+                "$ref": "#/schemas/AddObservations"
+            },
+            "server": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-memory"
+                ]
+            }
+        },
+        {
+            "name": "add_memory_detail",
+            "source": "add_observations",
+            "description": "Add a new observation or detail to an existing entity in your memory.",
+            "inputSchema": {
+                "$ref": "#/schemas/AddObservations"
+            }
+        },
+        {
+            "name": "read_graph",
+            "description": "Raw tool to read graph",
+            "inputSchema": {
+                "$ref": "#/schemas/ReadGraph"
+            },
+            "server": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-memory"
+                ]
+            }
+        },
+        {
+            "name": "recall_all_memories",
+            "source": "read_graph",
+            "description": "Retrieve the entire knowledge graph of entities and relations you have stored.",
+            "inputSchema": {
+                "$ref": "#/schemas/ReadGraph"
+            }
+        },
+        {
+            "name": "search_nodes",
+            "description": "Raw tool to search nodes",
+            "inputSchema": {
+                "$ref": "#/schemas/SearchNodes"
+            },
+            "server": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-memory"
+                ]
+            }
+        },
+        {
+            "name": "search_memories",
+            "source": "search_nodes",
+            "description": "Search for specific entities or concepts in your memory.",
+            "inputSchema": {
+                "$ref": "#/schemas/SearchNodes"
+            }
+        },
+        {
+            "name": "open_nodes",
+            "description": "Raw tool to open nodes",
+            "inputSchema": {
+                "$ref": "#/schemas/OpenNodes"
+            },
+            "server": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-memory"
+                ]
+            }
+        },
+        {
+            "name": "examine_memory",
+            "source": "open_nodes",
+            "description": "Retrieve detailed information about specific entities in your memory.",
+            "inputSchema": {
+                "$ref": "#/schemas/OpenNodes"
+            }
+        }
+    ]
+}

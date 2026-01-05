@@ -1,0 +1,28 @@
+{
+    "schemas": {
+        "FetchInput": {
+            "type": "object",
+            "properties": {
+                "url": { "type": "string", "description": "URL to fetch" }
+            },
+            "required": ["url"]
+        }
+    },
+    "tools": [
+        {
+            "name": "fetch",
+            "description": "Original fetch tool from mcp-server-fetch",
+            "inputSchema": { "$ref": "#/schemas/FetchInput" },
+            "server": {
+                "command": "uvx",
+                "args": ["mcp-server-fetch"]
+            }
+        },
+        {
+            "name": "get_webpage",
+            "source": "fetch",
+            "description": "RENAMED: Retrieve content from a webpage URL",
+            "inputSchema": { "$ref": "#/schemas/FetchInput" }
+        }
+    ]
+}

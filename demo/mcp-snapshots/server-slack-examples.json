@@ -1,0 +1,54 @@
+{
+  "server": "slack-server",
+  "version": "0.2.0",
+  "tools": {
+    "search_messages": {
+      "description": "Search for messages in Slack",
+      "has_output_schema": false,
+      "example_input": {
+        "query": "deployment",
+        "count": 3
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Found 3 messages matching 'deployment':\n\n---\n\n**#engineering** - Posted by @alice on Dec 22, 2025 at 3:45 PM\n> Starting deployment of v2.5.0 to production. ETA: 20 minutes.\n> \n> Change log: https://github.com/company/app/releases/v2.5.0\n\nReactions: ✅ 5, 🚀 3\n\n---\n\n**#devops** - Posted by @bob on Dec 22, 2025 at 4:10 PM\n> Deployment completed successfully! All health checks passing.\n> \n> Performance metrics looking good 📊\n\nReactions: 🎉 8, ✅ 4\n\n---\n\n**#general** - Posted by @carol on Dec 21, 2025 at 10:30 AM\n> Reminder: We have a deployment freeze starting Dec 24 through Jan 2.\n\nReactions: 👍 12"
+          }
+        ]
+      }
+    },
+    "list_channels": {
+      "description": "List channels in the workspace",
+      "has_output_schema": false,
+      "example_input": {
+        "limit": 5
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Channels in workspace (showing 5):\n\n• #general (1,234 members)\n  General company announcements and discussions\n  \n• #engineering (156 members)\n  Engineering team discussions\n  \n• #product (89 members)\n  Product planning and updates\n  \n• #random (892 members)\n  Random chat and fun\n  \n• #support (45 members)\n  Customer support coordination"
+          }
+        ]
+      }
+    },
+    "post_message": {
+      "description": "Post a message to a Slack channel",
+      "has_output_schema": false,
+      "example_input": {
+        "channel": "#engineering",
+        "text": "Deployment complete! ✅"
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Message posted successfully to #engineering\n\nMessage ID: 1734972345.123456\nTimestamp: 2025-12-23 09:45:45 PST\nPermalink: https://workspace.slack.com/archives/C01234/p1734972345123456"
+          }
+        ]
+      }
+    }
+  }
+}
+

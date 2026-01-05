@@ -1,0 +1,55 @@
+# MCP Gateway Demo - Docker Compose Stack
+#
+# Usage:
+#   ./run-demo.sh           # Start UI + Gateway
+#   ./run-demo.sh agent     # Start with agent chat enabled
+#
+# Or manually:
+#   docker compose up gateway ui
+#   ANTHROPIC_API_KEY=sk-... docker compose up
+
+services:
+  # MCP Gateway - aggregates backend MCP servers
+  gateway:
+    build:
+      context: ..
+      dockerfile: demo/Dockerfile.gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./registries:/app/registries:ro
+    environment:
+      - REGISTRY_PATH=${REGISTRY_PATH:-/app/registries/showcase.json}
+    command: >
+      uv run --no-sync mcp-proxy
+      --named-server-config ${REGISTRY_PATH:-/app/registries/showcase.json}
+      --host 0.0.0.0
+      --port 8080
+      --pass-environment
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # FastHTML UI - Registry viewer + Tool tester + Agent chat
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./registries:/app/registries:ro
+    environment:
+      - GATEWAY_URL=http://gateway:8080
+      - REGISTRIES_DIR=/app/registries
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+networks:
+  default:
+    name: mcp-gateway-demo

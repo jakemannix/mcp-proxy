@@ -1,0 +1,22 @@
+{
+  "server": "mcp-fetch",
+  "version": "1.25.0",
+  "tools": {
+    "fetch": {
+      "description": "Fetches a URL from the internet and optionally extracts its contents as markdown.",
+      "has_output_schema": false,
+      "example_input": {
+        "url": "https://example.com",
+        "max_length": 2000
+      },
+      "example_output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "# Example Domain\n\nThis domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission.\n\n[More information...](https://www.iana.org/domains/example)"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -3,16 +3,35 @@
 This server is created independent of any transport mechanism.
 """
 
+import copy
 import logging
 import typing as t
 
 from mcp import server, types
 from mcp.client.session import ClientSession
+from typing import TypedDict
+
+from .output_transformer import (
+    apply_output_projection,
+    get_structured_content,
+    strip_source_fields,
+)
+
+class ToolOverride(TypedDict, total=False):
+    """Configuration for overriding tool behavior."""
+    rename: str
+    description: str
+    defaults: dict[str, t.Any]
+    hide_fields: list[str]
+    output_schema: dict[str, t.Any]
 
 logger = logging.getLogger(__name__)
 
 
-async def create_proxy_server(remote_app: ClientSession) -> server.Server[object]:  # noqa: C901, PLR0915
+async def create_proxy_server(
+    remote_app: ClientSession,
+    tool_overrides: dict[str, ToolOverride] | None = None,
+) -> server.Server[object]:  # noqa: C901, PLR0915
     """Create a server instance from a remote app."""
     logger.debug("Sending initialization request to remote MCP server...")
     response = await remote_app.initialize()
@@ -85,17 +104,129 @@ async def create_proxy_server(remote_app: ClientSession) -> server.Server[object
         logger.debug("Capabilities: adding Tools...")
 
         async def _list_tools(_: t.Any) -> types.ServerResult:  # noqa: ANN401
-            tools = await remote_app.list_tools()
-            return types.ServerResult(tools)
+            result = await remote_app.list_tools()
+            
+            if not tool_overrides:
+                return types.ServerResult(result)
+
+            modified_tools = []
+            for tool in result.tools:
+                override = tool_overrides.get(tool.name)
+                if override:
+                    # Apply overrides
+                    new_name = override.get("rename", tool.name)
+                    new_description = override.get("description", tool.description)
+                    
+                    # Deep copy schema to avoid modifying original if it's shared (unlikely but safe)
+                    new_input_schema = copy.deepcopy(tool.inputSchema)
+                    
+                    defaults = override.get("defaults", {})
+                    hide_fields = override.get("hide_fields", [])
+                    output_schema = override.get("output_schema")
+                    
+                    if "properties" in new_input_schema and isinstance(new_input_schema["properties"], dict):
+                        props = new_input_schema["properties"]
+                        # Remove hidden fields
+                        for field in hide_fields:
+                            props.pop(field, None)
+                        # Remove fields that have defaults
+                        for field in defaults:
+                            props.pop(field, None)
+                    
+                    if "required" in new_input_schema and isinstance(new_input_schema["required"], list):
+                        reqs = new_input_schema["required"]
+                        # Filter out hidden/defaulted fields from required list
+                        new_input_schema["required"] = [
+                            f for f in reqs 
+                            if f not in hide_fields and f not in defaults
+                        ]
+
+                    tool_args = {
+                        "name": new_name,
+                        "description": new_description,
+                        "inputSchema": new_input_schema
+                    }
+                    
+                    # Apply outputSchema override if present (strip source_field metadata)
+                    if output_schema:
+                        tool_args["outputSchema"] = strip_source_fields(output_schema)
+                    # Otherwise pass through existing outputSchema (if SDK supports it)
+                    elif hasattr(tool, "outputSchema") and tool.outputSchema:
+                        tool_args["outputSchema"] = tool.outputSchema
+
+                    modified_tools.append(types.Tool(**tool_args))
+                else:
+                    modified_tools.append(tool)
+            
+            result.tools = modified_tools
+            return types.ServerResult(result)
 
         app.request_handlers[types.ListToolsRequest] = _list_tools
 
         async def _call_tool(req: types.CallToolRequest) -> types.ServerResult:
+            tool_name = req.params.name
+            arguments = req.params.arguments or {}
+            
+            original_name = tool_name
+            active_override = None
+
+            if tool_overrides:
+                # First check if this is a renamed tool
+                found_rename = False
+                for name, override in tool_overrides.items():
+                    if override.get("rename") == tool_name:
+                        original_name = name
+                        active_override = override
+                        found_rename = True
+                        break
+                
+                if not found_rename:
+                    # If not a renamed tool, check if it is an original tool with overrides (but no rename)
+                    if tool_name in tool_overrides:
+                        active_override = tool_overrides[tool_name]
+            
+            if active_override:
+                defaults = active_override.get("defaults", {})
+                # Inject defaults
+                for k, v in defaults.items():
+                    if k not in arguments:
+                        arguments[k] = v
+
             try:
                 result = await remote_app.call_tool(
-                    req.params.name,
-                    (req.params.arguments or {}),
+                    original_name,
+                    arguments,
                 )
+
+                # Process output schema if defined
+                if active_override and active_override.get("output_schema"):
+                    output_schema = active_override["output_schema"]
+
+                    # Get structured content - either existing or extracted from text
+                    structured = None
+                    if hasattr(result, "structuredContent") and isinstance(
+                        result.structuredContent, dict
+                    ):
+                        # Use existing structuredContent
+                        structured = result.structuredContent
+                    else:
+                        # Try to extract JSON from text content
+                        # Convert result to dict format for get_structured_content
+                        result_dict = {
+                            "content": [
+                                {"type": c.type, "text": getattr(c, "text", None)}
+                                for c in (result.content or [])
+                                if hasattr(c, "type")
+                            ]
+                        }
+                        structured = get_structured_content(result_dict)
+
+                    # Apply projection and set structuredContent
+                    if structured and isinstance(structured, dict):
+                        result.structuredContent = apply_output_projection(
+                            structured, output_schema
+                        )
+
                 return types.ServerResult(result)
             except Exception as e:  # noqa: BLE001
                 return types.ServerResult(

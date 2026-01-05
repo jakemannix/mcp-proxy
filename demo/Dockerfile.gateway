@@ -1,0 +1,34 @@
+# MCP Gateway Docker image
+FROM python:3.11-slim
+
+# Install Node.js for npx-based MCP servers, and curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nodejs \
+    npm \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install uv for fast Python package management
+RUN pip install uv
+
+# Copy dependency files first (changes rarely)
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies only, not the local project (cached unless deps change)
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Copy source code and metadata last (changes frequently)
+COPY src/ src/
+COPY LICENSE README.md ./
+
+# Install the local project as non-editable (fast, deps already cached)
+# Non-editable means code is copied to site-packages, works with read-only src mount
+RUN uv sync --frozen --no-dev --no-editable
+
+# Default port
+EXPOSE 8080
+
+# Default command (can be overridden in docker-compose)
+CMD ["uv", "run", "mcp-proxy", "--port", "8080"]

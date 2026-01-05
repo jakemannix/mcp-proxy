@@ -1,0 +1,114 @@
+{
+  "$comment": "Demo: Using JSONPath source_field to project server-memory outputs",
+
+  "tools": [
+    {
+      "name": "list_entity_names",
+      "description": "Get just the names of all entities in the knowledge graph",
+      "source": "read_graph",
+      "server": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-memory"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {"type": "string"},
+            "source_field": "$.entities[*].name"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_relation_sources",
+      "description": "Get just the 'from' entities of all relations",
+      "source": "read_graph",
+      "server": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-memory"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {"type": "string"},
+            "source_field": "$.relations[*].from"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_entity_summary",
+      "description": "Search and return simplified entity info (name + type only)",
+      "source": "search_nodes",
+      "server": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-memory"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query"}
+        },
+        "required": ["query"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "source_field": "$.entities[*]",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string", "source_field": "$.name"},
+                "type": {"type": "string", "source_field": "$.entityType"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "get_connections",
+      "description": "Get simplified connection info: who connects to whom",
+      "source": "read_graph",
+      "server": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-memory"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "source_field": "$.relations[*]",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subject": {"type": "string", "source_field": "$.from"},
+                "predicate": {"type": "string", "source_field": "$.relationType"},
+                "object": {"type": "string", "source_field": "$.to"}
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

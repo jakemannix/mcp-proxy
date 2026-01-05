@@ -1,0 +1,11 @@
+# Development overrides - mount registries for live config changes
+# This file is auto-loaded by docker compose alongside docker-compose.yml
+#
+# Note: Code changes require rebuild. For live code reload, use: ./run-demo.sh local
+#
+# For production builds without overrides:
+#   docker compose -f docker-compose.yml up --build
+
+# Currently empty - base compose handles everything
+# Registries are already mounted in base compose
+# Add development-specific overrides here as needed

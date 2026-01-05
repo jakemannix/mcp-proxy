@@ -1,0 +1,94 @@
+{
+  "mcp_server_time_get_current_time": {
+    "description": "Real output from uvx mcp-server-time get_current_time",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"timezone\": \"America/Los_Angeles\",\n  \"datetime\": \"2025-12-23T08:40:38-08:00\",\n  \"day_of_week\": \"Tuesday\",\n  \"is_dst\": false\n}"
+      }
+    ],
+    "isError": false
+  },
+  "mcp_server_time_convert_time": {
+    "description": "Real output from uvx mcp-server-time convert_time",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"source\": {\n    \"timezone\": \"UTC\",\n    \"datetime\": \"2025-12-23T12:00:00+00:00\",\n    \"day_of_week\": \"Tuesday\",\n    \"is_dst\": false\n  },\n  \"target\": {\n    \"timezone\": \"Asia/Tokyo\",\n    \"datetime\": \"2025-12-23T21:00:00+09:00\",\n    \"day_of_week\": \"Tuesday\",\n    \"is_dst\": false\n  },\n  \"time_difference\": \"+9.0h\"\n}"
+      }
+    ],
+    "isError": false
+  },
+  "mcp_server_fetch_api_json": {
+    "description": "Real output from uvx mcp-server-fetch with API endpoint (JSON with prefix text)",
+    "content": [
+      {
+        "type": "text",
+        "text": "Content type application/json; charset=utf-8 cannot be simplified to markdown, but here is the raw content:\nContents of https://api.github.com/repos/modelcontextprotocol/servers:\n{\"id\":890668799,\"node_id\":\"R_kgDONRaG_w\",\"name\":\"servers\",\"full_name\":\"modelcontextprotocol/servers\",\"private\":false,\"owner\":{\"login\":\"modelcontextprotocol\",\"id\":182288589},\"html_url\":\"https://github.com/modelcontextprotocol/servers\",\"description\":\"Model Context Protocol Servers\",\"fork\":false,\"stargazers_count\":1892,\"watchers_count\":1892}"
+      }
+    ],
+    "isError": false
+  },
+  "mcp_server_fetch_html": {
+    "description": "Markdown output from mcp-server-fetch (NOT JSON)",
+    "content": [
+      {
+        "type": "text",
+        "text": "# Example Domain\n\nThis domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission.\n\n[More information...](https://www.iana.org/domains/example)"
+      }
+    ],
+    "isError": false
+  },
+  "server_github_search": {
+    "description": "GitHub server output - markdown formatted list (NOT JSON)",
+    "content": [
+      {
+        "type": "text",
+        "text": "Found 5 repositories:\n\n1. **anthropics/mcp-python** (★ 2,341)\n   Official Python SDK for Model Context Protocol\n   https://github.com/anthropics/mcp-python\n\n2. **modelcontextprotocol/servers** (★ 1,892)\n   Reference MCP server implementations\n   https://github.com/modelcontextprotocol/servers"
+      }
+    ]
+  },
+  "server_memory_structured": {
+    "description": "Memory server with structuredContent (already has JSON)",
+    "content": [
+      {"type": "text", "text": "Created 2 entities"}
+    ],
+    "structuredContent": {
+      "entities": [
+        {
+          "name": "John_Smith",
+          "entityType": "person",
+          "observations": ["Works at Acme Corp"]
+        }
+      ]
+    }
+  },
+  "compact_json_array": {
+    "description": "Compact JSON array format",
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"id\": 1, \"name\": \"Alice\"}, {\"id\": 2, \"name\": \"Bob\"}]"
+      }
+    ]
+  },
+  "malformed_json": {
+    "description": "Text that looks like JSON but isn't valid",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"incomplete\": \"data\", \"missing\":"
+      }
+    ]
+  },
+  "json_with_trailing_text": {
+    "description": "Valid JSON followed by additional text",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"status\": \"complete\", \"count\": 42}\n\nNote: This operation completed successfully."
+      }
+    ]
+  }
+}
+
