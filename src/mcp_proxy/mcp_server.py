@@ -230,6 +230,26 @@ async def run_mcp_server(
                     if k not in final_args:
                         final_args[k] = v
 
+            # Coerce types based on inputSchema (string -> number/integer)
+            schema_props = tool.input_schema.get("properties", {})
+            logger.debug("Coercion: schema_props=%s, final_args=%s", schema_props, final_args)
+            for key, value in list(final_args.items()):
+                if key in schema_props and isinstance(value, str):
+                    prop_type = schema_props[key].get("type")
+                    logger.debug("Coercion: key=%s, value=%s, type=%s, prop_type=%s", key, value, type(value), prop_type)
+                    if prop_type == "integer":
+                        try:
+                            final_args[key] = int(value)
+                            logger.info("Coerced %s: %r -> %r", key, value, final_args[key])
+                        except ValueError:
+                            pass
+                    elif prop_type == "number":
+                        try:
+                            final_args[key] = float(value)
+                            logger.info("Coerced %s: %r -> %r", key, value, final_args[key])
+                        except ValueError:
+                            pass
+
             # Determine target name (source is the original tool name if set)
             target_name = tool.original_name or tool.name
 

@@ -165,7 +165,7 @@
     },
     {
       "$comment": "=== GITHUB SERVER - JSON extraction from API responses ===",
-      "name": "search_repos_raw",
+      "name": "search_repositories",
       "description": "Search GitHub repositories - returns full JSON response",
       "inputSchema": {
         "type": "object",
@@ -179,7 +179,7 @@
     },
     {
       "name": "search_repos",
-      "source": "search_repos_raw",
+      "source": "search_repositories",
       "description": "DEMO: GitHub search with clean output - extracts repo names, descriptions, and URLs",
       "outputSchema": {
         "type": "object",

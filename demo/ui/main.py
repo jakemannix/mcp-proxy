@@ -337,7 +337,7 @@ async def get_tool_detail(name: str):
 async def test_tool(name: str, request: Request):
     """Execute a tool with test inputs."""
     logger.info(f"=== TEST TOOL CALLED: {name} ===")
-    
+
     form_data = await request.form()
     arguments = {k: v for k, v in form_data.items() if v}
     logger.info(f"Form data received: {dict(form_data)}")
@@ -351,6 +351,26 @@ async def test_tool(name: str, request: Request):
                     arguments[key] = json.loads(value)
                 except json.JSONDecodeError:
                     pass
+
+    # Coerce types based on inputSchema (string -> number/integer)
+    tool = get_tool_by_name(name)
+    if tool:
+        schema_props = tool.get("inputSchema", {}).get("properties", {})
+        for key, value in list(arguments.items()):
+            if key in schema_props and isinstance(value, str):
+                prop_type = schema_props[key].get("type")
+                if prop_type == "integer":
+                    try:
+                        arguments[key] = int(value)
+                        logger.info(f"Coerced {key}: '{value}' -> {arguments[key]}")
+                    except ValueError:
+                        pass
+                elif prop_type == "number":
+                    try:
+                        arguments[key] = float(value)
+                        logger.info(f"Coerced {key}: '{value}' -> {arguments[key]}")
+                    except ValueError:
+                        pass
 
     logger.info(f"Calling tool with arguments: {arguments}")
     result = await call_tool(name, arguments)

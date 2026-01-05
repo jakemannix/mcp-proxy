@@ -46,7 +46,7 @@ SCENARIOS = {
     "github_search": {
         "name": "GitHub Search",
         "registry": "showcase.json",
-        "prompt": "Search GitHub for 'mcp server' repositories using search_repos (not the raw version). Show me the top 3 results with their names, descriptions, and URLs.",
+        "prompt": "Search GitHub for 'mcp server' repositories using search_repos (the projected virtual tool, not search_repositories). Show me the top 3 results with their names, descriptions, and URLs.",
         "description": "Tests JSON extraction + array projection from GitHub API"
     }
 }

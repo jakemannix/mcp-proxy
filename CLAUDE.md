@@ -115,6 +115,7 @@ git merge feature/my-feature
 
 ## Recent Work on `mcp-gateway-prototype`
 
+- **Type coercion**: UI and gateway coerce string→number/integer based on inputSchema
 - **Markdown list parsing (Phase 2)**: Configurable text extraction via `textExtraction` with regex patterns
 - **JSON-in-text extraction (Phase 1)**: Auto-extracts JSON from text responses into structuredContent
 - **Schema inheritance**: Virtual tools inherit inputSchema from source when not specified
@@ -125,7 +126,7 @@ git merge feature/my-feature
 - **Registry PoC**: VirtualTool abstraction with `source` inheritance
 - **Tool overrides**: rename, defaults, hide_fields
 - **MCP server snapshots**: Real-world outputSchema usage analysis (see `demo/mcp-snapshots/`)
-- **GitHub demo**: Added GitHub server tools demonstrating array projection
+- **GitHub demo**: Added GitHub server tools demonstrating array projection with `search_repos`
 - **Test suite**: 203 tests passing (Python 3.12)
 
 ## Open Work
