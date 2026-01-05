@@ -908,3 +908,174 @@ html, body {
     color: var(--text-muted);
     flex-shrink: 0;
 }
+
+/* ============================================
+   OAuth Section
+   ============================================ */
+
+.oauth-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.oauth-server-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+}
+
+.oauth-server-name {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.oauth-btn {
+    font-size: 0.7rem;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+
+.oauth-btn.oauth-connected {
+    background: var(--accent-success);
+    color: var(--bg-primary);
+}
+
+.oauth-btn.oauth-disconnected {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.oauth-btn.oauth-disconnected:hover {
+    background: var(--accent-primary-hover);
+}
+
+.oauth-empty-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: var(--space-sm);
+}
+
+/* OAuth callback pages */
+.oauth-error, .oauth-success {
+    max-width: 500px;
+    margin: 4rem auto;
+    padding: var(--space-2xl);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+    text-align: center;
+}
+
+.oauth-error h2 {
+    color: var(--accent-danger);
+    margin-bottom: var(--space-lg);
+}
+
+.oauth-success h2 {
+    color: var(--accent-success);
+    margin-bottom: var(--space-lg);
+}
+
+.oauth-error p, .oauth-success p {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+}
+
+.btn-back {
+    display: inline-block;
+    margin-top: var(--space-lg);
+    padding: var(--space-sm) var(--space-lg);
+    background: var(--accent-primary);
+    color: white;
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+}
+
+.btn-back:hover {
+    background: var(--accent-primary-hover);
+}
+
+/* ============================================
+   Tool Card OAuth Indicators
+   ============================================ */
+
+.oauth-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    padding: 2px;
+    border-radius: 4px;
+}
+
+.oauth-indicator.oauth-required {
+    color: var(--accent-warning);
+    background: rgba(245, 158, 11, 0.15);
+}
+
+.oauth-indicator.oauth-authenticated {
+    color: var(--accent-success);
+    background: rgba(16, 185, 129, 0.15);
+}
+
+/* OAuth status banner in tool detail */
+.oauth-banner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-lg);
+}
+
+.oauth-banner-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.oauth-banner-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.oauth-banner-text {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.oauth-banner.oauth-banner-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: var(--accent-warning);
+}
+
+.oauth-banner.oauth-banner-warning .oauth-banner-text {
+    color: var(--text-secondary);
+}
+
+.oauth-banner.oauth-banner-success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--accent-success);
+}
+
+.oauth-connect-link {
+    color: var(--accent-primary);
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+.oauth-connect-link:hover {
+    color: var(--accent-primary-hover);
+}

@@ -1,0 +1,18 @@
+{
+  "server": "cloudflare-radar",
+  "description": "Example outputs from Cloudflare Radar MCP server (internet analytics)",
+  "examples": [
+    {
+      "tool": "get_domains_ranking",
+      "arguments": {"rankingType": "TRENDING_RISE", "limit": 5},
+      "output": {
+        "text": "{\"result\":{\"top_0\":[{\"rank\":1,\"domain\":\"adt.com\",\"categories\":[{\"id\":75,\"name\":\"Business\",\"superCategoryId\":3}],\"pctRankChange\":58.14},{\"rank\":2,\"domain\":\"fwupd.org\",\"categories\":[{\"id\":155,\"name\":\"Technology\",\"superCategoryId\":26}],\"pctRankChange\":56.71},{\"rank\":3,\"domain\":\"myfxbook.com\",\"categories\":[{\"id\":185,\"name\":\"Personal Finance\",\"superCategoryId\":3}],\"pctRankChange\":52.22},{\"rank\":4,\"domain\":\"nfl.com\",\"categories\":[{\"id\":122,\"name\":\"News & Media\",\"superCategoryId\":7},{\"id\":152,\"name\":\"Sports\",\"superCategoryId\":25},{\"id\":164,\"name\":\"Video Streaming\",\"superCategoryId\":7}],\"pctRankChange\":42.97},{\"rank\":5,\"domain\":\"producthunt.com\",\"categories\":[{\"id\":148,\"name\":\"Shopping\",\"superCategoryId\":22},{\"id\":155,\"name\":\"Technology\",\"superCategoryId\":26}],\"pctRankChange\":40.19}],\"meta\":{\"dateRange\":[{\"startTime\":\"2026-01-01T00:00:00Z\",\"endTime\":\"2026-01-05T00:00:00Z\"}],\"confidenceInfo\":null,\"normalization\":null,\"lastUpdated\":null,\"units\":null,\"top_0\":{\"date\":\"2026-01-05\"}}}}"
+      },
+      "notes": "JSON-in-text: complex nested structure with ranking data",
+      "extraction_path": "$.result.top_0[*]",
+      "projected_fields": ["rank", "domain", "pctRankChange"]
+    }
+  ],
+  "extraction_applicable": true,
+  "extraction_strategy": "json_in_text"
+}

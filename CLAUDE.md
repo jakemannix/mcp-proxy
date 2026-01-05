@@ -43,14 +43,16 @@ Deterministic middleware decisions + LLM planning assists:
 | File | Purpose |
 |------|---------|
 | `src/mcp_proxy/__main__.py` | CLI entry point, argument parsing |
-| `src/mcp_proxy/mcp_server.py` | Gateway server: multi-backend aggregation |
+| `src/mcp_proxy/mcp_server.py` | Gateway server: multi-backend aggregation, OAuth connect endpoint |
 | `src/mcp_proxy/proxy_server.py` | Single-backend proxy with tool overrides |
-| `src/mcp_proxy/config_loader.py` | Registry/config parsing, VirtualTool creation |
+| `src/mcp_proxy/config_loader.py` | Registry/config parsing, VirtualTool creation, source chain resolution |
 | `src/mcp_proxy/json_detector.py` | JSON-in-text detection and extraction |
 | `src/mcp_proxy/markdown_list_parser.py` | Markdown list parsing for text extraction |
 | `src/mcp_proxy/output_transformer.py` | JSONPath extraction and outputSchema projection |
 | `src/mcp_proxy/sse_client.py` | SSE client mode (stdio ↔ SSE bridge) |
 | `src/mcp_proxy/streamablehttp_client.py` | Streamable HTTP client mode |
+| `demo/ui/oauth.py` | OAuth 2.1 PKCE flow, token management, metadata discovery |
+| `scripts/mcp_client.py` | CLI tool for testing MCP servers with OAuth support |
 
 ## Build & Test
 
@@ -115,6 +117,13 @@ git merge feature/my-feature
 
 ## Recent Work on `mcp-gateway-prototype`
 
+- **OAuth support**: Generic OAuth 2.1 with PKCE for remote MCP servers
+  - Session-based token storage in UI
+  - Dedicated `/oauth/connect` endpoint on gateway for connection establishment
+  - Visual indicators (lock/unlock icons) showing auth status on tools
+  - Supports Cloudflare Radar and other OAuth-protected servers
+- **Cloudflare MCP servers**: Added to showcase registry (docs, radar with OAuth)
+- **Source chain resolution**: `originalName` now follows source chain to find backend tool name
 - **Type coercion**: UI and gateway coerce string→number/integer based on inputSchema
 - **Markdown list parsing (Phase 2)**: Configurable text extraction via `textExtraction` with regex patterns
 - **JSON-in-text extraction (Phase 1)**: Auto-extracts JSON from text responses into structuredContent
@@ -127,7 +136,7 @@ git merge feature/my-feature
 - **Tool overrides**: rename, defaults, hide_fields
 - **MCP server snapshots**: Real-world outputSchema usage analysis (see `demo/mcp-snapshots/`)
 - **GitHub demo**: Added GitHub server tools demonstrating array projection with `search_repos`
-- **Test suite**: 203 tests passing (Python 3.12)
+- **Test suite**: 204 tests passing (Python 3.12)
 
 ## Open Work
 

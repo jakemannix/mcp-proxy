@@ -21,12 +21,13 @@ class ServerConfig:
     url: str | None = None
     transport: Literal["sse", "streamablehttp"] = "sse"
     env: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    auth: Literal["none", "oauth"] = "none"
 
     @property
     def id(self) -> str:
         """Generate a unique ID for this server configuration."""
         # Create a stable string representation for hashing
-        key = f"{self.command}|{self.args}|{self.url}|{self.transport}|{sorted(self.env)}"
+        key = f"{self.command}|{self.args}|{self.url}|{self.transport}|{sorted(self.env)}|{self.auth}"
         return hashlib.sha256(key.encode()).hexdigest()
 
 
@@ -144,7 +145,8 @@ def load_registry_from_file(
             args=tuple(server_def.get("args", [])),
             url=server_def.get("url"),
             transport=server_def.get("transport", "sse"),
-            env=tuple(sorted(env_list))
+            env=tuple(sorted(env_list)),
+            auth=server_def.get("auth", "none"),
         )
         
         if server_config.id not in unique_servers:
@@ -236,12 +238,28 @@ def load_registry_from_file(
                 )
                 continue  # Skip this tool, don't add it to virtual_tools
 
+        # Resolve original_name: follow source chain to find the actual backend tool name
+        original_name = tool_def.get("originalName")
+        if not original_name and source_name:
+            # Follow the source chain to find the original backend tool name
+            source_tool = tools_by_name[source_name]
+            while True:
+                if "originalName" in source_tool:
+                    original_name = source_tool["originalName"]
+                    break
+                elif "source" in source_tool:
+                    source_tool = tools_by_name[source_tool["source"]]
+                else:
+                    # No originalName in chain, use the source's name as the backend tool
+                    original_name = source_tool["name"]
+                    break
+
         virtual_tools.append(VirtualTool(
             name=name,
             description=tool_def.get("description"),
             input_schema=input_schema,
             server_id=server_config.id,
-            original_name=source_name if source_name else tool_def.get("originalName"),
+            original_name=original_name,
             defaults=defaults,
             output_schema=tool_def.get("outputSchema"),
             text_extraction=tool_def.get("textExtraction"),

@@ -1,0 +1,995 @@
+{
+  "server": "cloudflare-radar",
+  "url": "https://radar.mcp.cloudflare.com/mcp",
+  "transport": "streamablehttp",
+  "auth": "oauth",
+  "tools": [
+    {
+      "name": "accounts_list",
+      "description": "List all accounts in your Cloudflare account",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "set_active_account",
+      "description": "Set active account to be used for tool calls that require accountId",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activeAccountIdParam": {
+            "type": "string",
+            "description": "The accountId present in the users Cloudflare account, that should be the active accountId."
+          }
+        },
+        "required": [
+          "activeAccountIdParam"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_autonomous_systems",
+      "description": "List Autonomous Systems",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "location": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]{2}$",
+            "description": "Filters results by location. Specify a valid alpha-2 location code."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "ASN",
+              "POPULATION"
+            ],
+            "description": "Optional order by parameter: \"ASN\" or \"POPULATION\"."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_as_details",
+      "description": "Get Autonomous System details by ASN",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asn": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Autonomous System Number (ASN), must be a positive number."
+          }
+        },
+        "required": [
+          "asn"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_ip_details",
+      "description": "Get IP address information",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "anyOf": [
+              {
+                "format": "ipv4"
+              },
+              {
+                "format": "ipv6"
+              }
+            ],
+            "description": "IPv4 or IPv6 address in standard notation."
+          }
+        },
+        "required": [
+          "ip"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_traffic_anomalies",
+      "description": "Get traffic anomalies and outages",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "asn": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Autonomous System Number (ASN), must be a positive number."
+          },
+          "location": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]{2}$",
+            "description": "Filters results by location. Specify a valid alpha-2 location code."
+          },
+          "dateRange": {
+            "type": "string",
+            "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_internet_services_ranking",
+      "description": "Get top Internet services",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number"
+          },
+          "date": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date",
+              "description": "Filters results by date."
+            },
+            "description": "Filters results by date."
+          },
+          "serviceCategory": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Generative AI",
+                "E-commerce",
+                "Cryptocurrency Services",
+                "Email",
+                "Fast Fashion",
+                "Financial Services",
+                "News",
+                "Social Media",
+                "Weather",
+                "Jobs",
+                "Low cost E-commerce",
+                "Messaging",
+                "Metaverse & Gaming"
+              ]
+            },
+            "description": "Filters results by Internet service category."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_domains_ranking",
+      "description": "Get top or trending domains",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number"
+          },
+          "date": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date",
+              "description": "Filters results by date."
+            },
+            "description": "Filters results by date."
+          },
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z]{2}$",
+              "description": "Filters results by location. Specify a valid alpha-2 location code."
+            },
+            "description": "Filters results by location. Specify a comma-separated list of alpha-2 location codes."
+          },
+          "rankingType": {
+            "type": "string",
+            "enum": [
+              "POPULAR",
+              "TRENDING_RISE",
+              "TRENDING_STEADY"
+            ],
+            "description": "The ranking type."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_domain_rank_details",
+      "description": "Get domain rank details",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "pattern": "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])\\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9])$",
+            "description": "A valid domain name, e.g., example.com or sub.domain.co.uk. Must follow standard domain formatting rules without protocol or path."
+          },
+          "date": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date",
+              "description": "Filters results by date."
+            },
+            "description": "Filters results by date."
+          }
+        },
+        "required": [
+          "domain"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_http_data",
+      "description": "Retrieve HTTP traffic trends.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateRange": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+              "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+            },
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+            },
+            "description": "Start of the date range. Either use this parameter together with `dateEnd` or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "asn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filters results by ASN. Provide an array of ASN strings. Prefix with `-` to exclude (e.g., [\"-174\", \"3356\"] excludes AS174 and includes AS3356). "
+          },
+          "continent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by continent. Provide an array of alpha-2 continent codes (e.g., \"EU\", \"NA\"). Prefix a code with `-` to exclude it (e.g., [\"-EU\", \"NA\"] excludes Europe and includes North America)."
+          },
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by location. Provide an array of alpha-2 country codes (e.g., \"US\", \"PT\"). Prefix a code with `-` to exclude it (e.g., [\"-US\", \"PT\"] excludes the US and includes Portugal)."
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "timeseries",
+              "summary/deviceType",
+              "summary/httpProtocol",
+              "summary/httpVersion",
+              "summary/botClass",
+              "summary/ipVersion",
+              "summary/tlsVersion",
+              "summary/os",
+              "summary/postQuantum",
+              "top/browser",
+              "top/browserFamily",
+              "timeseriesGroups/deviceType",
+              "timeseriesGroups/httpProtocol",
+              "timeseriesGroups/httpVersion",
+              "timeseriesGroups/botClass",
+              "timeseriesGroups/ipVersion",
+              "timeseriesGroups/tlsVersion",
+              "timeseriesGroups/os",
+              "timeseriesGroups/postQuantum",
+              "timeseriesGroups/browser",
+              "timeseriesGroups/browserFamily",
+              "top/locations",
+              "top/ases"
+            ],
+            "description": "Dimension indicating the type and format of HTTP data to retrieve."
+          }
+        },
+        "required": [
+          "dimension"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_dns_queries_data",
+      "description": "Retrieve trends in DNS queries to the 1.1.1.1 resolver.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateRange": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+              "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+            },
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+            },
+            "description": "Start of the date range. Either use this parameter together with `dateEnd` or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "asn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filters results by ASN. Provide an array of ASN strings. Prefix with `-` to exclude (e.g., [\"-174\", \"3356\"] excludes AS174 and includes AS3356). "
+          },
+          "continent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by continent. Provide an array of alpha-2 continent codes (e.g., \"EU\", \"NA\"). Prefix a code with `-` to exclude it (e.g., [\"-EU\", \"NA\"] excludes Europe and includes North America)."
+          },
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by location. Provide an array of alpha-2 country codes (e.g., \"US\", \"PT\"). Prefix a code with `-` to exclude it (e.g., [\"-US\", \"PT\"] excludes the US and includes Portugal)."
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "timeseries",
+              "summary/ipVersion",
+              "summary/cacheHit",
+              "summary/dnssec",
+              "summary/dnssecAware",
+              "summary/matchingAnswer",
+              "summary/protocol",
+              "summary/queryType",
+              "summary/responseCode",
+              "summary/responseTTL",
+              "timeseriesGroups/ipVersion",
+              "timeseriesGroups/cacheHit",
+              "timeseriesGroups/dnssecAware",
+              "timeseriesGroups/matchingAnswer",
+              "timeseriesGroups/protocol",
+              "timeseriesGroups/queryType",
+              "timeseriesGroups/responseCode",
+              "timeseriesGroups/responseTTL",
+              "top/locations",
+              "top/ases"
+            ],
+            "description": "Dimension indicating the type and format of DNS data to retrieve."
+          }
+        },
+        "required": [
+          "dimension"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_l7_attack_data",
+      "description": "Retrieve application layer (L7) attack trends.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateRange": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+              "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+            },
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+            },
+            "description": "Start of the date range. Either use this parameter together with `dateEnd` or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "asn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filters results by ASN. Provide an array of ASN strings. Prefix with `-` to exclude (e.g., [\"-174\", \"3356\"] excludes AS174 and includes AS3356). "
+          },
+          "continent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by continent. Provide an array of alpha-2 continent codes (e.g., \"EU\", \"NA\"). Prefix a code with `-` to exclude it (e.g., [\"-EU\", \"NA\"] excludes Europe and includes North America)."
+          },
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by location. Provide an array of alpha-2 country codes (e.g., \"US\", \"PT\"). Prefix a code with `-` to exclude it (e.g., [\"-US\", \"PT\"] excludes the US and includes Portugal)."
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "timeseries",
+              "summary/httpMethod",
+              "summary/httpVersion",
+              "summary/ipVersion",
+              "summary/managedRules",
+              "summary/mitigationProduct",
+              "top/vertical",
+              "top/industry",
+              "timeseriesGroups/httpMethod",
+              "timeseriesGroups/httpVersion",
+              "timeseriesGroups/ipVersion",
+              "timeseriesGroups/managedRules",
+              "timeseriesGroups/mitigationProduct",
+              "timeseriesGroups/vertical",
+              "timeseriesGroups/industry",
+              "top/locations/origin",
+              "top/locations/target",
+              "top/ases/origin",
+              "top/attacks"
+            ],
+            "description": "Dimension indicating the type and format of L7 attack data to retrieve."
+          }
+        },
+        "required": [
+          "dimension"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_l3_attack_data",
+      "description": "Retrieve application layer (L3) attack trends.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateRange": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+              "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+            },
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+            },
+            "description": "Start of the date range. Either use this parameter together with `dateEnd` or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "asn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filters results by ASN. Provide an array of ASN strings. Prefix with `-` to exclude (e.g., [\"-174\", \"3356\"] excludes AS174 and includes AS3356). "
+          },
+          "continent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by continent. Provide an array of alpha-2 continent codes (e.g., \"EU\", \"NA\"). Prefix a code with `-` to exclude it (e.g., [\"-EU\", \"NA\"] excludes Europe and includes North America)."
+          },
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by location. Provide an array of alpha-2 country codes (e.g., \"US\", \"PT\"). Prefix a code with `-` to exclude it (e.g., [\"-US\", \"PT\"] excludes the US and includes Portugal)."
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "timeseries",
+              "summary/protocol",
+              "summary/ipVersion",
+              "summary/vector",
+              "summary/bitrate",
+              "summary/duration",
+              "top/vertical",
+              "top/industry",
+              "timeseriesGroups/protocol",
+              "timeseriesGroups/ipVersion",
+              "timeseriesGroups/vector",
+              "timeseriesGroups/bitrate",
+              "timeseriesGroups/duration",
+              "timeseriesGroups/vertical",
+              "timeseriesGroups/industry",
+              "top/locations/origin",
+              "top/locations/target",
+              "top/attacks"
+            ],
+            "description": "Dimension indicating the type and format of L3 attack data to retrieve."
+          }
+        },
+        "required": [
+          "dimension"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_email_routing_data",
+      "description": "Retrieve Email Routing trends.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateRange": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+              "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+            },
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+            },
+            "description": "Start of the date range. Either use this parameter together with `dateEnd` or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "summary/ipVersion",
+              "summary/encrypted",
+              "summary/arc",
+              "summary/dkim",
+              "summary/dmarc",
+              "summary/spf",
+              "timeseriesGroups/ipVersion",
+              "timeseriesGroups/encrypted",
+              "timeseriesGroups/arc",
+              "timeseriesGroups/dkim",
+              "timeseriesGroups/dmarc",
+              "timeseriesGroups/spf"
+            ],
+            "description": "Dimension indicating the type and format of Email Routing data to retrieve."
+          }
+        },
+        "required": [
+          "dimension"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_email_security_data",
+      "description": "Retrieve Email Security trends.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateRange": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+              "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+            },
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+            },
+            "description": "Start of the date range. Either use this parameter together with `dateEnd` or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "summary/spam",
+              "summary/malicious",
+              "summary/spoof",
+              "summary/threatCategory",
+              "summary/arc",
+              "summary/dkim",
+              "summary/dmarc",
+              "summary/spf",
+              "summary/tlsVersion",
+              "timeseriesGroups/spam",
+              "timeseriesGroups/malicious",
+              "timeseriesGroups/spoof",
+              "timeseriesGroups/threatCategory",
+              "timeseriesGroups/arc",
+              "timeseriesGroups/dkim",
+              "timeseriesGroups/dmarc",
+              "timeseriesGroups/spf",
+              "timeseriesGroups/tlsVersion",
+              "top/tlds"
+            ],
+            "description": "Dimension indicating the type and format of Email Security data to retrieve."
+          }
+        },
+        "required": [
+          "dimension"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_internet_speed_data",
+      "description": "Retrieve summary of bandwidth, latency, jitter, and packet loss, from the previous 90 days of Cloudflare Speed Test.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "asn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filters results by ASN. Provide an array of ASN strings. Prefix with `-` to exclude (e.g., [\"-174\", \"3356\"] excludes AS174 and includes AS3356). "
+          },
+          "continent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by continent. Provide an array of alpha-2 continent codes (e.g., \"EU\", \"NA\"). Prefix a code with `-` to exclude it (e.g., [\"-EU\", \"NA\"] excludes Europe and includes North America)."
+          },
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by location. Provide an array of alpha-2 country codes (e.g., \"US\", \"PT\"). Prefix a code with `-` to exclude it (e.g., [\"-US\", \"PT\"] excludes the US and includes Portugal)."
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "top/locations",
+              "top/ases"
+            ],
+            "description": "Dimension indicating the type and format of Internet speed data to retrieve."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "BANDWIDTH_DOWNLOAD",
+              "BANDWIDTH_UPLOAD",
+              "LATENCY_IDLE",
+              "LATENCY_LOADED",
+              "JITTER_IDLE",
+              "JITTER_LOADED"
+            ],
+            "description": "Specifies the metric to order the results by. Only allowed for top locations and ASes"
+          }
+        },
+        "required": [
+          "dimension"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_internet_quality_data",
+      "description": "Retrieves a summary or time series of bandwidth, latency, or DNS response time percentiles from the Radar Internet Quality Index (IQI).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateRange": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+              "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+            },
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+            },
+            "description": "Start of the date range. Either use this parameter together with `dateEnd` or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "asn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filters results by ASN. Provide an array of ASN strings. Prefix with `-` to exclude (e.g., [\"-174\", \"3356\"] excludes AS174 and includes AS3356). "
+          },
+          "continent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by continent. Provide an array of alpha-2 continent codes (e.g., \"EU\", \"NA\"). Prefix a code with `-` to exclude it (e.g., [\"-EU\", \"NA\"] excludes Europe and includes North America)."
+          },
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by location. Provide an array of alpha-2 country codes (e.g., \"US\", \"PT\"). Prefix a code with `-` to exclude it (e.g., [\"-US\", \"PT\"] excludes the US and includes Portugal)."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "timeseriesGroups"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "BANDWIDTH",
+              "DNS",
+              "LATENCY"
+            ],
+            "description": "Specifies which metric to return (bandwidth, latency, or DNS response time)."
+          }
+        },
+        "required": [
+          "format",
+          "metric"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_ai_data",
+      "description": "Retrieves AI-related data, including traffic from AI user agents, as well as popular models and model tasks specifically from Cloudflare Workers AI.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateRange": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^((([1-9]|[1-9][0-9]|[1-2][0-9][0-9]|3[0-5][0-9]|36[0-4])d(control)?)|(([1-9]|[1-4][0-9]|5[0-2])w(control)?))$",
+              "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+            },
+            "description": "Filters results by date range. For example, use `7d` and `7dcontrol` to compare this week with the previous week. Use this parameter or set specific start and end dates (`dateStart` and `dateEnd` parameters)."
+          },
+          "dateStart": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start date in ISO 8601 format (e.g., 2023-04-01T00:00:00Z). Either use this parameter together with `dateEnd`, or use `dateRange`."
+            },
+            "description": "Start of the date range. Either use this parameter together with `dateEnd` or use `dateRange`."
+          },
+          "dateEnd": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End date in ISO 8601 format (e.g., 2023-04-30T23:59:59Z). Either use this parameter together with `dateStart`, or use `dateRange`."
+            },
+            "description": "End of the date range. Either use this parameter together with `dateStart`, or use `dateRange`."
+          },
+          "asn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filters results by ASN. Provide an array of ASN strings. Prefix with `-` to exclude (e.g., [\"-174\", \"3356\"] excludes AS174 and includes AS3356). "
+          },
+          "continent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by continent. Provide an array of alpha-2 continent codes (e.g., \"EU\", \"NA\"). Prefix a code with `-` to exclude it (e.g., [\"-EU\", \"NA\"] excludes Europe and includes North America)."
+          },
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(-?[a-zA-Z]{2})$"
+            },
+            "description": "Filters results by location. Provide an array of alpha-2 country codes (e.g., \"US\", \"PT\"). Prefix a code with `-` to exclude it (e.g., [\"-US\", \"PT\"] excludes the US and includes Portugal)."
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "bots/summary/userAgent",
+              "bots/timeseriesGroups/userAgent",
+              "inference/summary/model",
+              "inference/summary/task",
+              "inference/timeseriesGroups/model",
+              "inference/timeseriesGroups/task"
+            ],
+            "description": "Dimension indicating the type and format of AI data to retrieve."
+          }
+        },
+        "required": [
+          "dimension"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "scan_url",
+      "description": "Submit a URL to scan",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "A valid URL including protocol (e.g., \"https://example.com\")."
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    }
+  ]
+}

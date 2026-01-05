@@ -5,15 +5,22 @@ from monsterui.all import *
 import json
 
 
-def ToolCard(tool: dict, selected: bool = False):
-    """Render a tool as a selectable card."""
+def ToolCard(tool: dict, selected: bool = False, oauth_required: bool = False, oauth_authenticated: bool = False):
+    """Render a tool as a selectable card.
+
+    Args:
+        tool: Tool configuration dict
+        selected: Whether this card is currently selected
+        oauth_required: Whether this tool requires OAuth authentication
+        oauth_authenticated: Whether OAuth has been completed for this tool's server
+    """
     name = tool.get("name", "unknown")
     source = tool.get("source")
     has_projection = "outputSchema" in tool
     defaults = tool.get("defaults", {})
     has_defaults = bool(defaults)
     server = tool.get("server")
-    
+
     # Detect if this is a virtual tool that structures text output
     is_text_to_structured = source and has_projection and not server
 
@@ -27,10 +34,27 @@ def ToolCard(tool: dict, selected: bool = False):
     if source:
         badges.append(Span(f"→ {source}", cls="badge badge-source"))
 
+    # OAuth status indicator
+    oauth_indicator = None
+    if oauth_required:
+        if oauth_authenticated:
+            oauth_indicator = Span(
+                UkIcon("unlock", height=12, width=12),
+                cls="oauth-indicator oauth-authenticated",
+                title="OAuth connected"
+            )
+        else:
+            oauth_indicator = Span(
+                UkIcon("lock", height=12, width=12),
+                cls="oauth-indicator oauth-required",
+                title="OAuth required - click to authenticate"
+            )
+
     return Div(
         Div(
             UkIcon("terminal", height=14, width=14, cls="tool-icon"),
             Span(name, cls="tool-name"),
+            oauth_indicator,
             cls="tool-card-header"
         ),
         Div(*badges, cls="tool-badges") if badges else None,
@@ -41,8 +65,15 @@ def ToolCard(tool: dict, selected: bool = False):
     )
 
 
-def ToolDetail(tool: dict):
-    """Render detailed tool view with schema and test form."""
+def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bool = False, oauth_url: str = None):
+    """Render detailed tool view with schema and test form.
+
+    Args:
+        tool: Tool configuration dict
+        oauth_required: Whether this tool requires OAuth authentication
+        oauth_authenticated: Whether OAuth has been completed for this tool's server
+        oauth_url: URL for OAuth authentication if required
+    """
     name = tool.get("name", "unknown")
     source = tool.get("source")
     description = tool.get("description", "No description provided")
@@ -50,7 +81,7 @@ def ToolDetail(tool: dict):
     output_schema = tool.get("outputSchema")
     defaults = tool.get("defaults", {})
     server = tool.get("server")
-    
+
     # Detect if this is a virtual tool that structures text output
     is_text_to_structured = source and output_schema and not server
 
@@ -60,7 +91,7 @@ def ToolDetail(tool: dict):
     header_badges = []
     if is_text_to_structured:
         header_badges.append(Span("Text → Structured JSON", cls="header-badge badge-text-extract"))
-    
+
     sections.append(
         Div(
             Div(
@@ -73,7 +104,37 @@ def ToolDetail(tool: dict):
             cls="detail-header"
         )
     )
-    
+
+    # OAuth status banner
+    if oauth_required and not oauth_authenticated:
+        sections.append(
+            Div(
+                Div(
+                    UkIcon("lock", height=16, width=16),
+                    Span("OAuth Authentication Required", cls="oauth-banner-title"),
+                    cls="oauth-banner-header"
+                ),
+                P(
+                    "This tool requires OAuth authentication. ",
+                    A("Connect now", href=f"/oauth/start?url={oauth_url}", cls="oauth-connect-link") if oauth_url else "",
+                    " to use this tool.",
+                    cls="oauth-banner-text"
+                ),
+                cls="oauth-banner oauth-banner-warning"
+            )
+        )
+    elif oauth_required and oauth_authenticated:
+        sections.append(
+            Div(
+                Div(
+                    UkIcon("unlock", height=16, width=16),
+                    Span("OAuth Connected", cls="oauth-banner-title"),
+                    cls="oauth-banner-header"
+                ),
+                cls="oauth-banner oauth-banner-success"
+            )
+        )
+
     # Text-to-Structured explanation
     if is_text_to_structured:
         sections.append(

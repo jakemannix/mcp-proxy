@@ -459,6 +459,45 @@ def test_chained_source_inheritance(
     assert len(server_ids) == 1
 
 
+def test_chained_source_original_name_resolution(
+    create_temp_config_file: Callable[[dict[str, t.Any]], str],
+) -> None:
+    """Test that original_name follows the source chain to find the backend tool name."""
+    config_content = {
+        "tools": [
+            {
+                "name": "backend_tool",
+                "server": {"url": "http://api.example.com/mcp", "transport": "streamablehttp"},
+                "inputSchema": {"type": "object"},
+                "originalName": "actual_backend_name",  # The real name on the backend
+            },
+            {
+                "name": "alias_tool",
+                "source": "backend_tool",  # References backend_tool
+                "inputSchema": {"type": "object"},
+            },
+            {
+                "name": "virtual_tool",
+                "source": "alias_tool",  # References alias_tool which references backend_tool
+                "inputSchema": {"type": "object"},
+            },
+        ],
+    }
+    tmp_config_path = create_temp_config_file(config_content)
+
+    servers, tools = load_registry_from_file(tmp_config_path, {})
+
+    # Find each tool
+    backend_tool = next(t for t in tools if t.name == "backend_tool")
+    alias_tool = next(t for t in tools if t.name == "alias_tool")
+    virtual_tool = next(t for t in tools if t.name == "virtual_tool")
+
+    # All should resolve to the same originalName from the chain
+    assert backend_tool.original_name == "actual_backend_name"
+    assert alias_tool.original_name == "actual_backend_name"
+    assert virtual_tool.original_name == "actual_backend_name"
+
+
 def test_virtual_tool_inherits_input_schema(
     create_temp_config_file: Callable[[dict[str, t.Any]], str],
 ) -> None:

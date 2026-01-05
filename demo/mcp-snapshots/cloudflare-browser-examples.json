@@ -1,0 +1,24 @@
+{
+  "server": "cloudflare-browser",
+  "description": "Example outputs from Cloudflare Browser Rendering MCP server",
+  "examples": [
+    {
+      "tool": "accounts_list",
+      "arguments": {},
+      "output": {
+        "text": "{\"accounts\":[{\"id\":\"4f1b0ed150ffe5a5ae1a46583799f570\",\"name\":\"Jake.mannix@gmail.com's Account\",\"created_on\":\"2026-01-05T16:21:30.652403Z\"}],\"count\":1}"
+      },
+      "notes": "JSON-in-text: accounts list wrapped in JSON object"
+    },
+    {
+      "tool": "get_url_markdown",
+      "arguments": {"url": "https://example.com"},
+      "output": {
+        "text": "{\"result\":\"# Example Domain\\n\\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\\n\\n[Learn more](https://iana.org/domains/example)\"}"
+      },
+      "notes": "JSON-in-text: markdown content in result field"
+    }
+  ],
+  "extraction_applicable": true,
+  "extraction_strategy": "json_in_text"
+}

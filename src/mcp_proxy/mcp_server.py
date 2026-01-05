@@ -40,6 +40,8 @@ from .markdown_list_parser import extract_markdown_list
 logger = logging.getLogger(__name__)
 
 
+
+
 @dataclass
 class MCPServerSettings:
     """Settings for the MCP server."""
@@ -115,6 +117,7 @@ def create_single_instance_routes(
 
     async def handle_streamable_http_instance(scope: Scope, receive: Receive, send: Send) -> None:
         _update_global_activity()
+
         updated_scope = scope
         if scope.get("type") == "http":
             path = scope.get("path", "")
@@ -161,16 +164,25 @@ async def run_mcp_server(
     
     # Use AsyncExitStack to manage lifecycles of multiple components
     async with contextlib.AsyncExitStack() as stack:
+        # Initialize Backends (skip OAuth backends - they connect lazily)
+        active_backends: dict[str, ClientSession] = {}
+        oauth_pending: dict[str, ServerConfig] = {}  # OAuth backends waiting for token
+        lazy_stacks: dict[str, contextlib.AsyncExitStack] = {}  # Separate stacks for lazy connections
+
         # Manage lifespans of all StreamableHTTPSessionManagers
         @contextlib.asynccontextmanager
         async def combined_lifespan(_app: Starlette) -> AsyncIterator[None]:
             logger.info("Main application lifespan starting...")
             yield
             logger.info("Main application lifespan shutting down...")
+            # Clean up lazy OAuth connection stacks
+            for server_id, lazy_stack in list(lazy_stacks.items()):
+                try:
+                    await lazy_stack.aclose()
+                    logger.info("Cleaned up lazy connection: %s", server_id)
+                except Exception:
+                    logger.exception("Error cleaning up lazy connection: %s", server_id)
 
-        # Initialize Backends
-        active_backends: dict[str, ClientSession] = {}
-        
         for server_id, config in unique_servers.items():
             try:
                 if config.command:
@@ -187,21 +199,29 @@ async def run_mcp_server(
                     await session.initialize()
                     active_backends[server_id] = session
                 elif config.url:
-                    # Remote Server (SSE or Streamable HTTP)
-                    logger.info("Initializing remote backend: %s (transport: %s)", config.url, config.transport)
-                    # TODO: Support headers/auth if needed
-                    if config.transport == "streamablehttp":
-                        http_streams = await stack.enter_async_context(streamablehttp_client(config.url))
-                        session = await stack.enter_async_context(ClientSession(*http_streams))
+                    if config.auth == "oauth":
+                        # OAuth backend - defer connection until we have a token
+                        logger.info("Deferring OAuth backend: %s (will connect lazily)", config.url)
+                        oauth_pending[server_id] = config
                     else:
-                        sse_streams = await stack.enter_async_context(sse_client(config.url))
-                        session = await stack.enter_async_context(ClientSession(*sse_streams))
-                    await session.initialize()
-                    active_backends[server_id] = session
+                        # Non-OAuth remote server - connect immediately
+                        logger.info("Initializing remote backend: %s (transport: %s)", config.url, config.transport)
+                        if config.transport == "streamablehttp":
+                            read, write, _ = await stack.enter_async_context(
+                                streamablehttp_client(config.url)
+                            )
+                            session = await stack.enter_async_context(ClientSession(read, write))
+                        else:
+                            sse_streams = await stack.enter_async_context(
+                                sse_client(config.url)
+                            )
+                            session = await stack.enter_async_context(ClientSession(*sse_streams))
+                        await session.initialize()
+                        active_backends[server_id] = session
             except Exception:
                 logger.exception("Failed to initialize backend server %s", server_id)
                 # We continue, but tools using this backend will fail
-        
+
         # Create Aggregator Server
         gateway = MCPServerSDK("mcp-gateway")
 
@@ -225,6 +245,16 @@ async def run_mcp_server(
 
             # Get backend
             backend = active_backends.get(tool.server_id)
+
+            if not backend and tool.server_id in oauth_pending:
+                # OAuth backend not yet connected
+                config = oauth_pending.get(tool.server_id)
+                url = config.url if config else "unknown"
+                raise RuntimeError(
+                    f"Tool '{name}' requires OAuth authentication. "
+                    f"Please authenticate with {url} and establish the connection first."
+                )
+
             if not backend:
                 raise RuntimeError(f"Backend for tool {name} is not available")
 
@@ -309,8 +339,71 @@ async def run_mcp_server(
         )
         await stack.enter_async_context(http_manager.run())
 
+        async def handle_oauth_connect(request: Request) -> Response:
+            """Endpoint to establish OAuth backend connections outside of MCP handlers.
+
+            This avoids cancel scope conflicts by establishing connections in a
+            clean HTTP request context rather than within MCP tool handlers.
+            """
+            try:
+                body = await request.json()
+                server_url = body.get("server_url")
+                token = body.get("token")
+
+                if not server_url or not token:
+                    return JSONResponse(
+                        {"error": "Missing server_url or token"},
+                        status_code=400
+                    )
+
+                # Find the server_id for this URL
+                server_id = None
+                for sid, config in oauth_pending.items():
+                    if config.url == server_url:
+                        server_id = sid
+                        break
+
+                if not server_id:
+                    # Already connected or not an OAuth server
+                    return JSONResponse({"status": "already_connected"})
+
+                # Establish connection
+                config = oauth_pending[server_id]
+                headers = {"Authorization": f"Bearer {token}"}
+                logger.info("Establishing OAuth backend connection: %s", config.url)
+
+                lazy_stack = contextlib.AsyncExitStack()
+                await lazy_stack.__aenter__()
+
+                if config.transport == "streamablehttp":
+                    read, write, _ = await lazy_stack.enter_async_context(
+                        streamablehttp_client(config.url, headers=headers)
+                    )
+                    session = await lazy_stack.enter_async_context(ClientSession(read, write))
+                else:
+                    sse_streams = await lazy_stack.enter_async_context(
+                        sse_client(config.url, headers=headers)
+                    )
+                    session = await lazy_stack.enter_async_context(ClientSession(*sse_streams))
+
+                await session.initialize()
+                active_backends[server_id] = session
+                lazy_stacks[server_id] = lazy_stack
+                del oauth_pending[server_id]
+
+                logger.info("Successfully connected OAuth backend: %s", config.url)
+                return JSONResponse({"status": "connected", "server_url": server_url})
+
+            except Exception as e:
+                logger.exception("Failed to establish OAuth connection")
+                return JSONResponse(
+                    {"error": str(e)},
+                    status_code=500
+                )
+
         all_routes = [
             Route("/status", endpoint=_handle_status),
+            Route("/oauth/connect", endpoint=handle_oauth_connect, methods=["POST"]),
         ] + instance_routes
 
         middleware: list[Middleware] = []

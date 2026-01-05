@@ -12,8 +12,8 @@ COPY ui/pyproject.toml ui/uv.lock ./
 # Install dependencies (cached unless deps change)
 RUN uv sync --frozen --no-dev
 
-# Copy application code last (changes frequently)
-COPY ui/main.py ui/components.py ui/scenarios.py ui/style.css ./
+# Copy all application code (changes frequently)
+COPY ui/ ./
 
 # Default port
 EXPOSE 5001

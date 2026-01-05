@@ -48,6 +48,18 @@ SCENARIOS = {
         "registry": "showcase.json",
         "prompt": "Search GitHub for 'mcp server' repositories using search_repos (the projected virtual tool, not search_repositories). Show me the top 3 results with their names, descriptions, and URLs.",
         "description": "Tests JSON extraction + array projection from GitHub API"
+    },
+    "cloudflare_docs": {
+        "name": "Cloudflare Docs",
+        "registry": "showcase.json",
+        "prompt": "Search the Cloudflare documentation for 'Workers AI' using search_cloudflare_docs. This is a remote MCP server hosted by Cloudflare.",
+        "description": "Tests remote MCP server via streamable HTTP transport"
+    },
+    "cloudflare_radar": {
+        "name": "Cloudflare Radar (OAuth)",
+        "registry": "showcase.json",
+        "prompt": "Get the top 5 trending domains using trending_domains with rankingType TRENDING_RISE. This requires OAuth authentication - click Connect in the OAuth section first.",
+        "description": "Tests OAuth-protected remote MCP server + JSON extraction"
     }
 }
 
