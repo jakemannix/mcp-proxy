@@ -33,6 +33,8 @@ from starlette.routing import BaseRoute, Mount, Route
 from starlette.types import Receive, Scope, Send
 
 from .config_loader import ServerConfig, VirtualTool
+from .output_transformer import apply_output_projection, get_structured_content
+from .markdown_list_parser import extract_markdown_list
 
 logger = logging.getLogger(__name__)
 
@@ -210,39 +212,70 @@ async def run_mcp_server(
             return tools
 
         @gateway.call_tool()
-        async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageContent | EmbeddedResource]:
+        async def call_tool(name: str, arguments: dict) -> CallToolResult:
             # Find the tool
             tool = next((t for t in virtual_tools if t.name == name), None)
             if not tool:
                 raise ValueError(f"Tool not found: {name}")
-            
+
             # Get backend
             backend = active_backends.get(tool.server_id)
             if not backend:
                 raise RuntimeError(f"Backend for tool {name} is not available")
-            
+
             # Inject defaults
             final_args = arguments.copy()
             if tool.defaults:
                 for k, v in tool.defaults.items():
                     if k not in final_args:
                         final_args[k] = v
-            
-            # Determine target name
+
+            # Determine target name (source is the original tool name if set)
             target_name = tool.original_name or tool.name
-            # If original_name is set (from source), use it. 
-            # If not, use the tool's name (direct mapping).
-            # Wait, if source was used, original_name is the source tool's name.
-            # If source was NOT used, original_name is None, so we use tool.name.
-            # But wait, if I renamed a tool in the old override system, I need to map it.
-            # In the new registry, 'source' IS the original name.
-            # So if I have: name="remember_entities", source="create_entities" -> call "create_entities"
-            # If I have: name="read_file", source=None -> call "read_file"
-            
+
             logger.info("Routing call %s -> %s (backend: %s)", name, target_name, tool.server_id)
-            
+
             result = await backend.call_tool(target_name, final_args)
-            return result.content
+
+            # Apply text extraction and/or output schema projection if defined
+            if tool.output_schema or tool.text_extraction:
+                # Convert result to dict for processing
+                result_dict = {
+                    "content": [
+                        {"type": getattr(c, "type", "text"), "text": getattr(c, "text", None)}
+                        for c in (result.content or [])
+                    ]
+                }
+
+                # Try to extract structured content
+                structured = None
+
+                # Strategy 1: Try JSON detection (via get_structured_content)
+                structured = get_structured_content(result_dict)
+
+                # Strategy 2: Try markdown list extraction if JSON didn't work
+                if not structured and tool.text_extraction:
+                    text_content = result_dict["content"][0].get("text") if result_dict["content"] else None
+                    if text_content:
+                        parser = tool.text_extraction.get("parser", "")
+                        if parser in ("markdown_numbered_list", "markdown_bullet_list"):
+                            structured = extract_markdown_list(text_content, tool.text_extraction)
+
+                if structured:
+                    # Apply output schema projection if defined
+                    if tool.output_schema and isinstance(structured, dict):
+                        projected = apply_output_projection(structured, tool.output_schema)
+                    else:
+                        projected = structured
+
+                    return CallToolResult(
+                        content=result.content,
+                        structuredContent=projected,
+                        isError=result.isError,
+                    )
+
+            # No extraction or no structured content extracted
+            return result
 
         # Create Routes
         instance_routes, http_manager = create_single_instance_routes(

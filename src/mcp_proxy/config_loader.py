@@ -39,6 +39,8 @@ class VirtualTool:
     server_id: str
     original_name: str | None = None
     defaults: dict[str, Any] = field(default_factory=dict)
+    output_schema: dict[str, Any] | None = None
+    text_extraction: dict[str, Any] | None = None
 
 
 def _resolve_schema_ref(ref: str, schemas: dict[str, Any], tools_map: dict[str, Any]) -> dict[str, Any]:
@@ -239,8 +241,10 @@ def load_registry_from_file(
             description=tool_def.get("description"),
             input_schema=input_schema,
             server_id=server_config.id,
-            original_name=source_name if source_name else tool_def.get("originalName"), # source implies the original name is the source tool's name
-            defaults=defaults
+            original_name=source_name if source_name else tool_def.get("originalName"),
+            defaults=defaults,
+            output_schema=tool_def.get("outputSchema"),
+            text_extraction=tool_def.get("textExtraction"),
         ))
 
     for vt in virtual_tools:

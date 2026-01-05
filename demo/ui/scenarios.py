@@ -42,6 +42,12 @@ SCENARIOS = {
         "registry": "showcase.json",
         "prompt": "What's the time difference between America/New_York and Asia/Tokyo at 14:00? Use timezone_offset to get a clean summary.",
         "description": "Tests nested JSON extraction from convert_time"
+    },
+    "github_search": {
+        "name": "GitHub Search",
+        "registry": "showcase.json",
+        "prompt": "Search GitHub for 'mcp server' repositories using search_repos (not the raw version). Show me the top 3 results with their names, descriptions, and URLs.",
+        "description": "Tests JSON extraction + array projection from GitHub API"
     }
 }
 

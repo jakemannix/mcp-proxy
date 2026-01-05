@@ -48,14 +48,19 @@ chat_messages: list = []
 
 
 def load_registry(path: str) -> dict:
-    """Load a registry JSON file and resolve schema references."""
+    """Load a registry JSON file and resolve schema references and source inheritance."""
     try:
         with open(path) as f:
             registry = json.load(f)
 
-        # Resolve $ref in inputSchema for each tool
+        tools = registry.get("tools", [])
         schemas = registry.get("schemas", {})
-        for tool in registry.get("tools", []):
+
+        # Build lookup by name
+        tools_by_name = {t.get("name"): t for t in tools}
+
+        # Resolve $ref in inputSchema for each tool
+        for tool in tools:
             input_schema = tool.get("inputSchema", {})
             if isinstance(input_schema, dict) and "$ref" in input_schema:
                 ref = input_schema["$ref"]
@@ -63,6 +68,18 @@ def load_registry(path: str) -> dict:
                     schema_name = ref.split("/")[-1]
                     if schema_name in schemas:
                         tool["inputSchema"] = schemas[schema_name].copy()
+
+        # Inherit inputSchema from source for virtual tools
+        for tool in tools:
+            source_name = tool.get("source")
+            if source_name and "inputSchema" not in tool:
+                # Find the root source (follow chain)
+                source_tool = tools_by_name.get(source_name)
+                while source_tool and source_tool.get("source"):
+                    source_tool = tools_by_name.get(source_tool["source"])
+
+                if source_tool and "inputSchema" in source_tool:
+                    tool["inputSchema"] = source_tool["inputSchema"].copy()
 
         return registry
     except Exception as e:

@@ -162,6 +162,44 @@
           "offset": {"type": "string", "source_field": "$.time_difference"}
         }
       }
+    },
+    {
+      "$comment": "=== GITHUB SERVER - JSON extraction from API responses ===",
+      "name": "search_repos_raw",
+      "description": "Search GitHub repositories - returns full JSON response",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query"},
+          "perPage": {"type": "number", "description": "Results per page (max 100)"}
+        },
+        "required": ["query"]
+      },
+      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"]}
+    },
+    {
+      "name": "search_repos",
+      "source": "search_repos_raw",
+      "description": "DEMO: GitHub search with clean output - extracts repo names, descriptions, and URLs",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {"type": "integer", "source_field": "$.total_count"},
+          "repos": {
+            "type": "array",
+            "source_field": "$.items[*]",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string", "source_field": "$.full_name"},
+                "description": {"type": "string", "source_field": "$.description"},
+                "url": {"type": "string", "source_field": "$.html_url"},
+                "stars": {"type": "integer", "source_field": "$.stargazers_count"}
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
