@@ -34,7 +34,10 @@ from oauth import (
 SCRIPT_DIR = Path(__file__).parent
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://localhost:8080")
 REGISTRIES_DIR = Path(os.environ.get("REGISTRIES_DIR", SCRIPT_DIR.parent / "registries"))
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+# OpenRouter configuration
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "anthropic/claude-3.5-haiku")
 
 # FastHTML app setup with dark theme
 hdrs = Theme.slate.headers(mode='dark') + [
@@ -487,8 +490,12 @@ async def get_scenario_prompt(request: Request):
 
 
 @app.post("/agent/send")
-async def send_to_agent(prompt: str):
-    """Send a message to the AI agent."""
+async def send_to_agent(request: Request, prompt: str):
+    """Send a message to the AI agent via OpenRouter.
+
+    The API key is passed in the X-OpenRouter-Key header from the client's localStorage.
+    It's only used for this request and never logged or persisted server-side.
+    """
     global chat_messages
 
     if not prompt.strip():
@@ -497,24 +504,18 @@ async def send_to_agent(prompt: str):
     # Add user message
     chat_messages.append({"content": prompt, "role": "user"})
 
-    # Check for API key
-    if not ANTHROPIC_API_KEY:
-        chat_messages.append({
-            "content": "ANTHROPIC_API_KEY not set. Please set it in docker-compose or environment.",
-            "role": "assistant"
-        })
+    # Get API key from header (sent from client's localStorage)
+    api_key = request.headers.get("X-OpenRouter-Key", "")
+
+    if not api_key:
+        error_msg = "Please enter your OpenRouter API key above. Get one at openrouter.ai/keys"
+        chat_messages.append({"content": error_msg, "role": "assistant"})
         return Div(
             ChatMessage(prompt, "user"),
-            ChatMessage(chat_messages[-1]["content"], "assistant")
+            ChatMessage(error_msg, "assistant")
         )
 
-    # For now, return a placeholder - full agent integration would use Claude Agent SDK
-    # This is a simplified version that demonstrates the UI
     try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
         # Get available tools from registry
         tools_desc = "\n".join([
             f"- {t['name']}: {t.get('description', 'No description')}"
@@ -527,14 +528,37 @@ Available tools from the gateway:
 
 When using tools, explain what you're doing. Be concise."""
 
-        response = client.messages.create(
-            model="claude-3-5-haiku-20241022",
-            max_tokens=1024,
-            system=system,
-            messages=[{"role": "user", "content": prompt}]
-        )
+        # Call OpenRouter API (OpenAI-compatible)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "HTTP-Referer": GATEWAY_URL,  # Required by OpenRouter
+                    "X-Title": "MCP Gateway Demo",
+                },
+                json={
+                    "model": OPENROUTER_MODEL,
+                    "max_tokens": 1024,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt}
+                    ]
+                },
+                timeout=60.0
+            )
 
-        assistant_content = response.content[0].text
+        if response.status_code != 200:
+            error_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            error_msg = error_data.get("error", {}).get("message", f"OpenRouter error: {response.status_code}")
+            chat_messages.append({"content": error_msg, "role": "assistant"})
+            return Div(
+                ChatMessage(prompt, "user"),
+                ChatMessage(error_msg, "assistant")
+            )
+
+        result = response.json()
+        assistant_content = result["choices"][0]["message"]["content"]
         chat_messages.append({"content": assistant_content, "role": "assistant"})
 
         return Div(
@@ -542,8 +566,16 @@ When using tools, explain what you're doing. Be concise."""
             ChatMessage(assistant_content, "assistant")
         )
 
+    except httpx.TimeoutException:
+        error_msg = "Request timed out. Please try again."
+        chat_messages.append({"content": error_msg, "role": "assistant"})
+        return Div(
+            ChatMessage(prompt, "user"),
+            ChatMessage(error_msg, "assistant")
+        )
     except Exception as e:
-        error_msg = f"Error: {str(e)}"
+        # Don't log the full exception to avoid leaking API key in stack traces
+        error_msg = f"Error: {type(e).__name__}: {str(e)}"
         chat_messages.append({"content": error_msg, "role": "assistant"})
         return Div(
             ChatMessage(prompt, "user"),

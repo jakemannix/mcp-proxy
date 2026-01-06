@@ -583,6 +583,60 @@ html, body {
     flex-direction: column;
 }
 
+/* API Key Section */
+.api-key-section {
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-tertiary);
+}
+
+.api-key-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.api-key-link {
+    color: var(--accent-primary);
+    text-decoration: none;
+    font-size: 0.7rem;
+}
+
+.api-key-link:hover {
+    color: var(--accent-primary-hover);
+    text-decoration: underline;
+}
+
+.api-key-input {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+}
+
+.api-key-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.api-key-input::placeholder {
+    color: var(--text-muted);
+}
+
+.api-key-hint {
+    margin-top: var(--space-xs);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
 .chat-messages {
     flex: 1;
     overflow-y: auto;
