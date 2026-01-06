@@ -16,6 +16,7 @@ def ToolCard(tool: dict, selected: bool = False, oauth_required: bool = False, o
     """
     name = tool.get("name", "unknown")
     source = tool.get("source")
+    version = tool.get("version")
     has_projection = "outputSchema" in tool
     defaults = tool.get("defaults", {})
     has_defaults = bool(defaults)
@@ -25,6 +26,8 @@ def ToolCard(tool: dict, selected: bool = False, oauth_required: bool = False, o
     is_text_to_structured = source and has_projection and not server
 
     badges = []
+    if version:
+        badges.append(Span(f"v{version}", cls="badge badge-version"))
     if is_text_to_structured:
         badges.append(Span("text→json", cls="badge badge-text-extract"))
     elif has_projection:
@@ -76,6 +79,9 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
     """
     name = tool.get("name", "unknown")
     source = tool.get("source")
+    version = tool.get("version")
+    source_version_pin = tool.get("sourceVersionPin")
+    validation_mode = tool.get("validationMode", "warn")
     description = tool.get("description", "No description provided")
     input_schema = tool.get("inputSchema", {})
     output_schema = tool.get("outputSchema")
@@ -89,8 +95,18 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
 
     # Header section
     header_badges = []
+    if version:
+        header_badges.append(Span(f"v{version}", cls="header-badge badge-version"))
     if is_text_to_structured:
         header_badges.append(Span("Text → Structured JSON", cls="header-badge badge-text-extract"))
+
+    # Build source info with version pin
+    source_info = None
+    if source:
+        if source_version_pin:
+            source_info = Span(f"Source: {source} (pinned to v{source_version_pin})", cls="detail-source")
+        else:
+            source_info = Span(f"Source: {source}", cls="detail-source")
 
     sections.append(
         Div(
@@ -100,7 +116,7 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
                 *header_badges,
                 cls="detail-header-row"
             ),
-            Span(f"Source: {source}", cls="detail-source") if source else None,
+            source_info,
             cls="detail-header"
         )
     )

@@ -43,6 +43,17 @@ class VirtualTool:
     output_schema: dict[str, Any] | None = None
     text_extraction: dict[str, Any] | None = None
 
+    # Version fields (from registry)
+    version: str | None = None
+    expected_schema_hash: str | None = None
+    validation_mode: Literal["strict", "warn", "skip"] = "warn"
+    source_version_pin: str | None = None
+
+    # Computed at validation time
+    computed_schema_hash: str | None = None
+    validation_status: Literal["pending", "valid", "drift", "missing", "error"] = "pending"
+    validation_message: str | None = None
+
 
 def _resolve_schema_ref(ref: str, schemas: dict[str, Any], tools_map: dict[str, Any]) -> dict[str, Any]:
     """Resolve a JSON pointer reference like #/schemas/Entity or #/tools/0/inputSchema."""
@@ -254,6 +265,27 @@ def load_registry_from_file(
                     original_name = source_tool["name"]
                     break
 
+        # 5. Parse version fields
+        version = tool_def.get("version")
+        expected_schema_hash = tool_def.get("expectedSchemaHash")
+        validation_mode = tool_def.get("validationMode", "warn")
+        source_version_pin = tool_def.get("sourceVersionPin")
+
+        # 6. Validate sourceVersionPin if specified
+        if source_version_pin and source_name:
+            source_tool_def = tools_by_name[source_name]
+            source_version = source_tool_def.get("version")
+            if source_version != source_version_pin:
+                msg = (
+                    f"Tool '{name}' requires source '{source_name}' version "
+                    f"'{source_version_pin}' but found '{source_version}'"
+                )
+                if validation_mode == "strict":
+                    logger.error(f"{msg}. Skipping tool due to strict validation mode.")
+                    continue  # Skip this tool
+                else:
+                    logger.warning(f"{msg}. Continuing with warn mode.")
+
         virtual_tools.append(VirtualTool(
             name=name,
             description=tool_def.get("description"),
@@ -263,6 +295,10 @@ def load_registry_from_file(
             defaults=defaults,
             output_schema=tool_def.get("outputSchema"),
             text_extraction=tool_def.get("textExtraction"),
+            version=version,
+            expected_schema_hash=expected_schema_hash,
+            validation_mode=validation_mode,
+            source_version_pin=source_version_pin,
         ))
 
     for vt in virtual_tools:

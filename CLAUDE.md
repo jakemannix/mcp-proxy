@@ -35,6 +35,7 @@ Deterministic middleware decisions + LLM planning assists:
 | `docs/phase2a-sidecar-proxy-plan.md` | Implementation plan for sidecar proxy |
 | `docs/tool-hints-plan.md` | Plan for capability/behavior hints (MVA2) |
 | `docs/tool-composition-exploration.md` | Future pipeline/composition exploration |
+| `docs/tool-versioning-testing.md` | Manual testing guide for tool versioning |
 | `demo/mcp-snapshots/README.md` | Real-world MCP server outputSchema analysis |
 | `demo/mcp-snapshots/memory-projection-expected.md` | JSONPath projection demo with server-memory |
 
@@ -49,6 +50,7 @@ Deterministic middleware decisions + LLM planning assists:
 | `src/mcp_proxy/json_detector.py` | JSON-in-text detection and extraction |
 | `src/mcp_proxy/markdown_list_parser.py` | Markdown list parsing for text extraction |
 | `src/mcp_proxy/output_transformer.py` | JSONPath extraction and outputSchema projection |
+| `src/mcp_proxy/tool_versioning.py` | Schema hashing, backend validation, drift detection |
 | `src/mcp_proxy/sse_client.py` | SSE client mode (stdio ↔ SSE bridge) |
 | `src/mcp_proxy/streamablehttp_client.py` | Streamable HTTP client mode |
 | `demo/ui/oauth.py` | OAuth 2.1 PKCE flow, token management, metadata discovery |
@@ -117,6 +119,12 @@ git merge feature/my-feature
 
 ## Recent Work on `mcp-gateway-prototype`
 
+- **Tool versioning**: Semantic versioning and schema-hash validation for drift detection
+  - `version` field for human-readable semantic versions
+  - `expectedSchemaHash` for content-addressable backend validation (base tools only)
+  - `validationMode`: "strict" (disable on mismatch), "warn" (log), "skip" (no validation)
+  - `sourceVersionPin` for virtual tools to pin source tool versions
+  - Validation at startup (non-OAuth) and on OAuth connect (deferred)
 - **OAuth support**: Generic OAuth 2.1 with PKCE for remote MCP servers
   - Session-based token storage in UI
   - Dedicated `/oauth/connect` endpoint on gateway for connection establishment
@@ -136,7 +144,7 @@ git merge feature/my-feature
 - **Tool overrides**: rename, defaults, hide_fields
 - **MCP server snapshots**: Real-world outputSchema usage analysis (see `demo/mcp-snapshots/`)
 - **GitHub demo**: Added GitHub server tools demonstrating array projection with `search_repos`
-- **Test suite**: 204 tests passing (Python 3.12)
+- **Test suite**: 225 tests passing (Python 3.12)
 
 ## Open Work
 
