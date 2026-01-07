@@ -2,6 +2,10 @@
 
 A web interface for exploring MCP Gateway tool registries,
 testing tools interactively, and chatting with an AI agent.
+
+Supports multiple gateway backends via GATEWAY_BACKEND env var:
+- "mcp-proxy" (default): Python-based mcp-proxy gateway
+- "agentgateway": Rust-based agentgateway
 """
 
 import os
@@ -29,12 +33,20 @@ from oauth import (
     discover_oauth_metadata, register_client,
     OAuthFlow, store_pending_flow, get_pending_flow
 )
+from backend import (
+    get_backend, load_registry_from_file, convert_agentgateway_registry,
+    GatewayBackend
+)
 
 # Configuration
 SCRIPT_DIR = Path(__file__).parent
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://localhost:8080")
+GATEWAY_BACKEND_TYPE = os.environ.get("GATEWAY_BACKEND", "mcp-proxy").lower()
 REGISTRIES_DIR = Path(os.environ.get("REGISTRIES_DIR", SCRIPT_DIR.parent / "registries"))
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+# Initialize backend
+gateway_backend: GatewayBackend = get_backend(GATEWAY_URL)
 
 # FastHTML app setup with dark theme
 hdrs = Theme.slate.headers(mode='dark') + [
@@ -60,41 +72,7 @@ chat_messages: list = []
 
 def load_registry(path: str) -> dict:
     """Load a registry JSON file and resolve schema references and source inheritance."""
-    try:
-        with open(path) as f:
-            registry = json.load(f)
-
-        tools = registry.get("tools", [])
-        schemas = registry.get("schemas", {})
-
-        # Build lookup by name
-        tools_by_name = {t.get("name"): t for t in tools}
-
-        # Resolve $ref in inputSchema for each tool
-        for tool in tools:
-            input_schema = tool.get("inputSchema", {})
-            if isinstance(input_schema, dict) and "$ref" in input_schema:
-                ref = input_schema["$ref"]
-                if ref.startswith("#/schemas/"):
-                    schema_name = ref.split("/")[-1]
-                    if schema_name in schemas:
-                        tool["inputSchema"] = schemas[schema_name].copy()
-
-        # Inherit inputSchema from source for virtual tools
-        for tool in tools:
-            source_name = tool.get("source")
-            if source_name and "inputSchema" not in tool:
-                # Find the root source (follow chain)
-                source_tool = tools_by_name.get(source_name)
-                while source_tool and source_tool.get("source"):
-                    source_tool = tools_by_name.get(source_tool["source"])
-
-                if source_tool and "inputSchema" in source_tool:
-                    tool["inputSchema"] = source_tool["inputSchema"].copy()
-
-        return registry
-    except Exception as e:
-        return {"error": str(e), "tools": []}
+    return load_registry_from_file(path)
 
 
 def list_registries() -> list:
@@ -148,12 +126,7 @@ def get_unique_servers() -> list:
 
 async def check_gateway_health() -> bool:
     """Check if gateway is healthy."""
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{GATEWAY_URL}/status", timeout=2.0)
-            return resp.status_code == 200
-    except Exception:
-        return False
+    return await gateway_backend.check_health()
 
 
 async def call_tool(tool_name: str, arguments: dict) -> dict:
@@ -163,55 +136,7 @@ async def call_tool(tool_name: str, arguments: dict) -> dict:
         tool_name: Name of the tool to call
         arguments: Tool arguments
     """
-    # Common headers for MCP requests
-    mcp_headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream"
-    }
-
-    try:
-        async with httpx.AsyncClient() as client:
-            # Initialize session
-            init_resp = await client.post(
-                f"{GATEWAY_URL}/mcp/",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "initialize",
-                    "params": {
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {},
-                        "clientInfo": {"name": "demo-ui", "version": "1.0.0"}
-                    }
-                },
-                headers=mcp_headers,
-                timeout=30.0
-            )
-            session_id = init_resp.headers.get("mcp-session-id", "")
-
-            # Send initialized notification
-            await client.post(
-                f"{GATEWAY_URL}/mcp/",
-                json={"jsonrpc": "2.0", "method": "notifications/initialized"},
-                headers={**mcp_headers, "Mcp-Session-Id": session_id},
-                timeout=5.0
-            )
-
-            # Call the tool
-            resp = await client.post(
-                f"{GATEWAY_URL}/mcp/",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 2,
-                    "method": "tools/call",
-                    "params": {"name": tool_name, "arguments": arguments}
-                },
-                headers={**mcp_headers, "Mcp-Session-Id": session_id},
-                timeout=60.0
-            )
-            return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
+    return await gateway_backend.call_tool(tool_name, arguments)
 
 
 # Routes
@@ -223,6 +148,19 @@ async def index(request: Request):
 
     # Load default registry if not loaded
     registries = list_registries()
+
+    # For agentgateway, try to load registry from backend first
+    if not current_registry_path and GATEWAY_BACKEND_TYPE == "agentgateway":
+        try:
+            ag_registry = await gateway_backend.get_registry()
+            if ag_registry:
+                current_registry = convert_agentgateway_registry(ag_registry)
+                current_registry_path = "(from gateway)"
+                logger.info("Loaded registry from agentgateway")
+        except Exception as e:
+            logger.warning(f"Failed to load registry from agentgateway: {e}")
+
+    # Fall back to local registry files
     if not current_registry_path and registries:
         # Prefer showcase.json as default, otherwise use first available
         default_reg = "showcase.json" if "showcase.json" in registries else registries[0]
@@ -243,14 +181,27 @@ async def index(request: Request):
         return (False, False)
 
     # Registry selector options
-    registry_options = [
+    registry_options = []
+
+    # Add "From Gateway" option for agentgateway backend
+    if GATEWAY_BACKEND_TYPE == "agentgateway":
+        registry_options.append(
+            Option(
+                "From Gateway",
+                value="__gateway__",
+                selected=(current_registry_path == "(from gateway)")
+            )
+        )
+
+    # Add local registry file options
+    registry_options.extend([
         Option(
             reg,
             value=reg,
-            selected=(reg == Path(current_registry_path).name if current_registry_path else False)
+            selected=(reg == Path(current_registry_path).name if current_registry_path and current_registry_path != "(from gateway)" else False)
         )
         for reg in registries
-    ]
+    ])
 
     # Header bar
     header = Div(
@@ -278,7 +229,10 @@ async def index(request: Request):
                 ),
                 Div(
                     Span(cls=f"status-indicator {'status-online' if gateway_healthy else 'status-offline'}"),
-                    Span("Gateway" + (" Connected" if gateway_healthy else " Offline"), cls="status-text"),
+                    Span(
+                        gateway_backend.backend_name + (" Connected" if gateway_healthy else " Offline"),
+                        cls="status-text"
+                    ),
                     cls="status-badge"
                 ),
                 cls="header-controls"
@@ -386,13 +340,27 @@ async def index(request: Request):
 
 @app.post("/registry/load")
 async def load_registry_route(registry: str):
-    """Load a different registry file."""
+    """Load a different registry file or from gateway."""
     global current_registry, current_registry_path
 
-    path = REGISTRIES_DIR / registry
-    if path.exists():
-        current_registry_path = str(path)
-        current_registry = load_registry(current_registry_path)
+    if registry == "__gateway__":
+        # Load from agentgateway backend
+        try:
+            ag_registry = await gateway_backend.get_registry()
+            if ag_registry:
+                current_registry = convert_agentgateway_registry(ag_registry)
+                current_registry_path = "(from gateway)"
+                logger.info("Loaded registry from agentgateway")
+            else:
+                logger.warning("No registry available from gateway")
+        except Exception as e:
+            logger.error(f"Failed to load registry from gateway: {e}")
+    else:
+        # Load from local file
+        path = REGISTRIES_DIR / registry
+        if path.exists():
+            current_registry_path = str(path)
+            current_registry = load_registry(current_registry_path)
 
     # Use HX-Redirect header for HTMX to do a client-side redirect
     response = Response(status_code=200)
@@ -707,19 +675,9 @@ async def oauth_callback(request: Request, code: str = None, state: str = None, 
         # Establish connection to OAuth backend via gateway
         access_token = token_data.get("access_token")
         if access_token:
-            try:
-                async with httpx.AsyncClient() as client:
-                    resp = await client.post(
-                        f"{GATEWAY_URL}/oauth/connect",
-                        json={"server_url": flow.server_url, "token": access_token},
-                        timeout=30.0
-                    )
-                    if resp.status_code == 200:
-                        logger.info(f"Gateway connection established for {flow.server_url}")
-                    else:
-                        logger.warning(f"Gateway connection failed: {resp.text}")
-            except Exception as e:
-                logger.warning(f"Failed to establish gateway connection: {e}")
+            success = await gateway_backend.connect_oauth(flow.server_url, access_token)
+            if not success:
+                logger.warning(f"Gateway connection may have failed for {flow.server_url}")
 
         return Div(
             H2("Connected!"),
