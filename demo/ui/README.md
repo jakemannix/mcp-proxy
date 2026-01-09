@@ -1,0 +1,193 @@
+# MCP Gateway Demo UI
+
+A FastHTML web interface for exploring tool registries and testing MCP tools. The UI supports multiple backend gateways through a configurable adapter pattern.
+
+## Supported Backends
+
+The UI can work with two different MCP gateway implementations:
+
+### 1. MCP Proxy (Python) - Default
+
+**Repository**: `jakemannix/mcp-proxy`
+**Branch**: `mcp-gateway-prototype` (or `feature/tool-versioning`)
+**Default URL**: `http://localhost:8080`
+
+The Python-based gateway from this repository. Uses JSON-RPC over HTTP at the `/mcp/` endpoint with session management.
+
+**Endpoints used**:
+- `GET /status` - Health check
+- `POST /mcp/` - MCP JSON-RPC (initialize, tools/list, tools/call)
+- `POST /oauth/connect` - OAuth token connection
+
+### 2. Agent Gateway (Rust)
+
+**Repository**: `jakemannix/agentgateway`
+**Branch**: `feature/virtual_tools_and_registry`
+**Default URL**: `http://localhost:15000`
+
+A Rust-based MCP gateway implementation with similar virtual tools and registry functionality.
+
+**Endpoints used**:
+- `GET /config` - Health check
+- `GET /registry` - Fetch registry from gateway
+- `POST /mcp` - MCP JSON-RPC (note: no trailing slash)
+
+## Configuration
+
+Set environment variables to select and configure the backend:
+
+```bash
+# Select backend: "mcp-proxy" (default) or "agentgateway"
+export GATEWAY_BACKEND=mcp-proxy
+
+# Override gateway URL (optional - defaults based on backend)
+export GATEWAY_URL=http://localhost:8080
+```
+
+Default URLs by backend:
+- `mcp-proxy`: `http://localhost:8080`
+- `agentgateway`: `http://localhost:15000`
+
+## Testing with MCP Proxy Backend
+
+### 1. Build and start the gateway
+
+```bash
+cd /path/to/mcp-proxy
+git checkout mcp-gateway-prototype  # or feature/tool-versioning
+
+# Install dependencies
+uv sync
+
+# Start gateway with demo registry
+uv run mcp-proxy --named-server-config demo/registries/showcase.json --port 8080
+```
+
+### 2. Start the UI
+
+```bash
+# In another terminal
+cd demo/ui
+uv run python main.py
+
+# Or use docker-compose
+cd demo
+docker compose up --build
+```
+
+### 3. Access the UI
+
+- Gateway: http://localhost:8080
+- UI: http://localhost:5001
+
+The UI will show "MCP Proxy (Python)" in the status badge when connected.
+
+## Testing with Agent Gateway Backend
+
+### 1. Build and start agentgateway
+
+```bash
+cd /path/to/agentgateway
+git checkout feature/virtual_tools_and_registry
+
+# Build the Rust gateway
+cargo build --release
+
+# Start with a registry config
+./target/release/agentgateway --config path/to/config.yaml
+```
+
+Note: agentgateway configuration format differs from mcp-proxy. See the agentgateway documentation for config file structure.
+
+### 2. Start the UI with agentgateway backend
+
+```bash
+cd /path/to/mcp-proxy/demo/ui
+
+# Configure for agentgateway
+export GATEWAY_BACKEND=agentgateway
+export GATEWAY_URL=http://localhost:15000
+
+uv run python main.py
+```
+
+### 3. Access the UI
+
+- Gateway: http://localhost:15000 (or your configured port)
+- UI: http://localhost:5001
+
+The UI will show "Agent Gateway (Rust)" in the status badge when connected.
+
+## Feature Differences by Backend
+
+| Feature | MCP Proxy | Agent Gateway |
+|---------|-----------|---------------|
+| Registry loading | Local JSON files | From gateway (`/registry`) or local files |
+| Health endpoint | `/status` | `/config` |
+| MCP endpoint | `/mcp/` | `/mcp` |
+| OAuth flow | `/oauth/connect` | Handled at route/policy level |
+| Registry format | Native | Converted (snake_case → camelCase) |
+
+## Registry Loading
+
+The UI supports multiple ways to load tool registries:
+
+1. **Sample Registry** - Built-in demo registry for testing
+2. **Local JSON files** - Upload or select from filesystem
+3. **From Gateway** (agentgateway only) - Fetch live registry via `/registry` endpoint
+
+When using agentgateway, the "From Gateway" option fetches the registry directly from the running gateway and converts it to the UI's expected format.
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────┐
+│   Demo UI       │────▶│  Backend Adapter │
+│   (FastHTML)    │     │  (backend.py)    │
+└─────────────────┘     └──────────────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    ▼                     ▼
+          ┌─────────────────┐   ┌─────────────────┐
+          │  MCPProxyBackend│   │AgentGatewayBackend│
+          │  (Python)       │   │(Rust)           │
+          └─────────────────┘   └─────────────────┘
+                    │                     │
+                    ▼                     ▼
+          ┌─────────────────┐   ┌─────────────────┐
+          │  mcp-proxy      │   │  agentgateway   │
+          │  localhost:8080 │   │  localhost:15000│
+          └─────────────────┘   └─────────────────┘
+```
+
+The `backend.py` module provides:
+- `GatewayBackend` - Abstract base class defining the interface
+- `MCPProxyBackend` - Implementation for Python mcp-proxy
+- `AgentGatewayBackend` - Implementation for Rust agentgateway
+- `get_backend()` - Factory function using environment variables
+- `convert_agentgateway_registry()` - Format conversion utility
+
+## Troubleshooting
+
+### UI shows "Gateway Offline"
+
+1. Verify the gateway is running at the expected URL
+2. Check `GATEWAY_URL` environment variable
+3. Test the health endpoint directly:
+   ```bash
+   # For mcp-proxy
+   curl http://localhost:8080/status
+
+   # For agentgateway
+   curl http://localhost:15000/config
+   ```
+
+### Tools not appearing
+
+1. Ensure a registry is loaded (select from dropdown or upload)
+2. For agentgateway, try "From Gateway" option if registry endpoint is available
+3. Check gateway logs for backend connection errors
+
+### OAuth not working
+
+OAuth flow is currently only implemented for the mcp-proxy backend. For agentgateway, OAuth is typically handled at the infrastructure level (routes/policies).
