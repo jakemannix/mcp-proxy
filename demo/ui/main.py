@@ -87,6 +87,28 @@ def get_tools() -> list:
     return current_registry.get("tools", [])
 
 
+def get_servers() -> dict:
+    """Get servers lookup from current registry (name -> config)."""
+    servers_list = current_registry.get("servers", [])
+    return {s.get("name"): s for s in servers_list if s.get("name")}
+
+
+def get_server_config(server_ref: str | dict | None) -> dict | None:
+    """Get server config by name reference or return dict directly.
+
+    Handles both old format (server is dict) and new format (server is string).
+    """
+    if server_ref is None:
+        return None
+    if isinstance(server_ref, dict):
+        # Old format: server is inline dict
+        return server_ref
+    if isinstance(server_ref, str):
+        # New format: server is name reference
+        return get_servers().get(server_ref)
+    return None
+
+
 def get_tool_by_name(name: str) -> dict | None:
     """Find a tool by name."""
     for tool in get_tools():
@@ -97,9 +119,9 @@ def get_tool_by_name(name: str) -> dict | None:
 
 def get_tool_oauth_url(tool: dict) -> str | None:
     """Get the OAuth server URL for a tool, if it requires OAuth."""
-    # Check direct server config
-    server = tool.get("server", {})
-    if server.get("auth") == "oauth":
+    # Get server config (handles both string ref and inline dict)
+    server = get_server_config(tool.get("server"))
+    if server and server.get("auth") == "oauth":
         return server.get("url")
 
     # Check source tool if this is a virtual tool
@@ -113,15 +135,21 @@ def get_tool_oauth_url(tool: dict) -> str | None:
 
 
 def get_unique_servers() -> list:
-    """Extract unique server configurations."""
-    servers = {}
+    """Extract unique server names/identifiers."""
+    # New format: use named servers from servers section
+    servers = get_servers()
+    if servers:
+        return list(servers.keys())
+
+    # Fallback for old format: extract from tools
+    server_ids = {}
     for tool in get_tools():
         server = tool.get("server")
-        if server:
+        if isinstance(server, dict):
             server_id = server.get("command", "") or server.get("url", "")
-            if server_id and server_id not in servers:
-                servers[server_id] = server
-    return list(servers.keys())
+            if server_id and server_id not in server_ids:
+                server_ids[server_id] = server
+    return list(server_ids.keys())
 
 
 async def check_gateway_health() -> bool:
@@ -530,21 +558,38 @@ async def static(path: str):
 
 def get_oauth_servers(session: dict | None = None) -> list[dict]:
     """Get servers that require OAuth authentication."""
-    servers = []
+    oauth_servers = []
     seen_urls = set()
-    for tool in get_tools():
-        server = tool.get("server", {})
-        if server.get("auth") == "oauth" and server.get("url"):
-            url = server["url"]
+
+    # New format: check servers section directly
+    for server_name, server_config in get_servers().items():
+        if server_config.get("auth") == "oauth" and server_config.get("url"):
+            url = server_config["url"]
             if url not in seen_urls:
                 seen_urls.add(url)
                 token = get_stored_token(url, session)
-                servers.append({
+                oauth_servers.append({
                     "url": url,
                     "authenticated": token is not None,
                     "name": url.split("//")[1].split("/")[0] if "//" in url else url
                 })
-    return servers
+
+    # Fallback: check tools with inline server config (old format)
+    if not oauth_servers:
+        for tool in get_tools():
+            server = tool.get("server")
+            if isinstance(server, dict) and server.get("auth") == "oauth" and server.get("url"):
+                url = server["url"]
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    token = get_stored_token(url, session)
+                    oauth_servers.append({
+                        "url": url,
+                        "authenticated": token is not None,
+                        "name": url.split("//")[1].split("/")[0] if "//" in url else url
+                    })
+
+    return oauth_servers
 
 
 @app.get("/oauth/status")

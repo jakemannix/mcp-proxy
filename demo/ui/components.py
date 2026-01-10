@@ -20,11 +20,14 @@ def ToolCard(tool: dict, selected: bool = False, oauth_required: bool = False, o
     defaults = tool.get("defaults", {})
     has_defaults = bool(defaults)
     server = tool.get("server")
+    version = tool.get("version")
 
     # Detect if this is a virtual tool that structures text output
     is_text_to_structured = source and has_projection and not server
 
     badges = []
+    if version:
+        badges.append(Span(f"v{version}", cls="badge badge-version"))
     if is_text_to_structured:
         badges.append(Span("text→json", cls="badge badge-text-extract"))
     elif has_projection:

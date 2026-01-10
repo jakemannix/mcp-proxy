@@ -1,5 +1,43 @@
 {
   "$comment": "MCP Gateway Demo - Full Feature Showcase",
+  "schemaVersion": "1.0",
+
+  "servers": [
+    {
+      "name": "fetch-server",
+      "description": "Web content fetching via mcp-server-fetch",
+      "stdio": {"command": "uvx", "args": ["mcp-server-fetch"]}
+    },
+    {
+      "name": "memory-server",
+      "description": "Knowledge graph storage via server-memory",
+      "stdio": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+    },
+    {
+      "name": "time-server",
+      "description": "Timezone operations via mcp-server-time",
+      "stdio": {"command": "uvx", "args": ["mcp-server-time"]}
+    },
+    {
+      "name": "github-server",
+      "description": "GitHub API access via server-github",
+      "stdio": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"]}
+    },
+    {
+      "name": "cloudflare-docs",
+      "description": "Cloudflare documentation search (public)",
+      "url": "https://docs.mcp.cloudflare.com/mcp",
+      "transport": "streamablehttp"
+    },
+    {
+      "name": "cloudflare-radar",
+      "description": "Cloudflare Radar analytics (requires OAuth)",
+      "url": "https://radar.mcp.cloudflare.com/mcp",
+      "transport": "streamablehttp",
+      "auth": "oauth"
+    }
+  ],
+
   "schemas": {
     "FetchInput": {
       "type": "object",
@@ -27,12 +65,14 @@
       "required": ["entities"]
     }
   },
+
   "tools": [
     {
       "name": "fetch",
+      "server": "fetch-server",
       "description": "Original fetch tool from mcp-server-fetch",
       "inputSchema": {"$ref": "#/schemas/FetchInput"},
-      "server": {"command": "uvx", "args": ["mcp-server-fetch"]}
+      "version": "2.1.0"
     },
     {
       "name": "get_webpage",
@@ -41,9 +81,10 @@
     },
     {
       "name": "read_graph",
+      "server": "memory-server",
       "description": "Read the entire knowledge graph",
       "inputSchema": {"type": "object", "properties": {}},
-      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+      "version": "3.0.0"
     },
     {
       "name": "list_entity_names",
@@ -86,9 +127,10 @@
     },
     {
       "name": "create_entities",
+      "server": "memory-server",
       "description": "Create new entities in the knowledge graph",
       "inputSchema": {"$ref": "#/schemas/EntityInput"},
-      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
+      "version": "3.0.0"
     },
     {
       "name": "remember",
@@ -98,6 +140,7 @@
     {
       "$comment": "=== TIME SERVER - JSON-in-text extraction demos ===",
       "name": "get_current_time",
+      "server": "time-server",
       "description": "Get current time - returns JSON embedded in text (no structuredContent)",
       "inputSchema": {
         "type": "object",
@@ -109,7 +152,7 @@
         },
         "required": ["timezone"]
       },
-      "server": {"command": "uvx", "args": ["mcp-server-time"]}
+      "version": "0.8.1"
     },
     {
       "name": "get_time_structured",
@@ -138,6 +181,7 @@
     },
     {
       "name": "convert_time",
+      "server": "time-server",
       "description": "Convert time between timezones - returns nested JSON in text",
       "inputSchema": {
         "type": "object",
@@ -148,7 +192,7 @@
         },
         "required": ["source_timezone", "time", "target_timezone"]
       },
-      "server": {"command": "uvx", "args": ["mcp-server-time"]}
+      "version": "0.8.1"
     },
     {
       "name": "timezone_offset",
@@ -166,6 +210,7 @@
     {
       "$comment": "=== CLOUDFLARE DOCS - Remote MCP server (public, no auth) ===",
       "name": "search_cloudflare_docs",
+      "server": "cloudflare-docs",
       "description": "Search Cloudflare documentation - returns XML-like structured results",
       "inputSchema": {
         "type": "object",
@@ -174,12 +219,13 @@
         },
         "required": ["query"]
       },
-      "server": {"url": "https://docs.mcp.cloudflare.com/mcp", "transport": "streamablehttp"},
-      "originalName": "search_cloudflare_documentation"
+      "originalName": "search_cloudflare_documentation",
+      "version": "1.2.0"
     },
     {
       "$comment": "=== GITHUB SERVER - JSON extraction from API responses ===",
       "name": "search_repositories",
+      "server": "github-server",
       "description": "Search GitHub repositories - returns full JSON response",
       "inputSchema": {
         "type": "object",
@@ -189,7 +235,7 @@
         },
         "required": ["query"]
       },
-      "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"]}
+      "version": "1.5.2"
     },
     {
       "name": "search_repos",
@@ -218,6 +264,7 @@
     {
       "$comment": "=== CLOUDFLARE RADAR - OAuth-protected remote MCP server ===",
       "name": "get_trending_domains",
+      "server": "cloudflare-radar",
       "description": "Get trending domains from Cloudflare Radar (requires OAuth)",
       "inputSchema": {
         "type": "object",
@@ -230,12 +277,8 @@
           }
         }
       },
-      "server": {
-        "url": "https://radar.mcp.cloudflare.com/mcp",
-        "transport": "streamablehttp",
-        "auth": "oauth"
-      },
-      "originalName": "get_domains_ranking"
+      "originalName": "get_domains_ranking",
+      "version": "2.0.0"
     },
     {
       "name": "trending_domains",
@@ -261,6 +304,7 @@
     },
     {
       "name": "get_ip_info",
+      "server": "cloudflare-radar",
       "description": "Get IP address information from Cloudflare Radar (requires OAuth)",
       "inputSchema": {
         "type": "object",
@@ -269,12 +313,8 @@
         },
         "required": ["ip"]
       },
-      "server": {
-        "url": "https://radar.mcp.cloudflare.com/mcp",
-        "transport": "streamablehttp",
-        "auth": "oauth"
-      },
-      "originalName": "get_ip_details"
+      "originalName": "get_ip_details",
+      "version": "2.0.0"
     }
   ]
 }

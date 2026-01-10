@@ -79,6 +79,10 @@ def load_registry_from_file(
 ) -> tuple[dict[str, ServerConfig], list[VirtualTool]]:
     """Loads registry configuration from a JSON file.
 
+    The registry format has two main sections:
+    - "servers": Named server definitions (stdio commands or remote URLs)
+    - "tools": Tool definitions that reference servers by name
+
     Args:
         config_file_path: Path to the JSON configuration file.
         base_env: The base environment dictionary to be inherited by servers.
@@ -98,57 +102,69 @@ def load_registry_from_file(
         raise ValueError(f"Could not read registry file: {e}") from e
 
     schemas = data.get("schemas", {})
+    servers_data = data.get("servers", [])
     tools_data = data.get("tools", [])
-    
-    unique_servers: dict[str, ServerConfig] = {}
-    virtual_tools: list[VirtualTool] = []
-    
-    # First pass: Index tools by name for "source" resolution
-    tools_by_name = {t["name"]: t for t in tools_data}
 
-    for i, tool_def in enumerate(tools_data):
-        name = tool_def["name"]
-        
-        # 1. Resolve Server Config
-        server_def = tool_def.get("server")
-        source_name = tool_def.get("source")
-        
-        if source_name:
-            if source_name not in tools_by_name:
-                raise ValueError(f"Tool '{name}' references unknown source '{source_name}'")
-            # Inherit server from source
-            parent = tools_by_name[source_name]
-            # Recurse up if the parent also has a source (simple loop for now)
-            while "source" in parent:
-                parent = tools_by_name[parent["source"]]
-            server_def = parent.get("server")
-            
-        if not server_def:
-            raise ValueError(f"Tool '{name}' has no server configuration and no valid source.")
+    # Build named servers mapping from "servers" section
+    named_servers: dict[str, ServerConfig] = {}
+    for server_def in servers_data:
+        server_name = server_def.get("name")
+        if not server_name:
+            raise ValueError("Server definition missing 'name' field")
 
-        # Create ServerConfig object
+        # Parse stdio config
+        stdio_def = server_def.get("stdio", {})
+        command = stdio_def.get("command") if stdio_def else None
+        args = tuple(stdio_def.get("args", [])) if stdio_def else ()
+
+        # Parse env
         env_list = []
         if "env" in server_def:
-             for k, v in server_def["env"].items():
-                 env_list.append((k, v))
-        
-        # Merge base_env if it's a stdio server (command is present)
-        if "command" in server_def:
-             # We don't merge base_env into the hashable config to keep it clean,
-             # but we'll need to apply it at runtime. 
-             # Actually, let's merge it here so the ID reflects the actual env?
-             # No, base_env is global. Let's keep ServerConfig clean.
-             pass
+            for k, v in server_def["env"].items():
+                env_list.append((k, v))
 
         server_config = ServerConfig(
-            command=server_def.get("command"),
-            args=tuple(server_def.get("args", [])),
+            command=command,
+            args=args,
             url=server_def.get("url"),
             transport=server_def.get("transport", "sse"),
             env=tuple(sorted(env_list)),
             auth=server_def.get("auth", "none"),
         )
-        
+        named_servers[server_name] = server_config
+        logger.info(f"Registered server '{server_name}': {server_config}")
+
+    unique_servers: dict[str, ServerConfig] = {}
+    virtual_tools: list[VirtualTool] = []
+
+    # Index tools by name for "source" resolution
+    tools_by_name = {t["name"]: t for t in tools_data}
+
+    for i, tool_def in enumerate(tools_data):
+        name = tool_def["name"]
+
+        # 1. Resolve Server Config
+        server_ref = tool_def.get("server")  # Now a string reference to named server
+        source_name = tool_def.get("source")
+
+        if source_name:
+            if source_name not in tools_by_name:
+                raise ValueError(f"Tool '{name}' references unknown source '{source_name}'")
+            # Inherit server from source chain
+            parent = tools_by_name[source_name]
+            while "source" in parent:
+                parent = tools_by_name[parent["source"]]
+            server_ref = parent.get("server")
+
+        if not server_ref:
+            raise ValueError(f"Tool '{name}' has no server reference and no valid source.")
+
+        # Look up server by name
+        if server_ref not in named_servers:
+            raise ValueError(f"Tool '{name}' references unknown server '{server_ref}'")
+
+        server_config = named_servers[server_ref]
+
         if server_config.id not in unique_servers:
             unique_servers[server_config.id] = server_config
             

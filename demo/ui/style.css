@@ -323,6 +323,13 @@ html, body {
     color: var(--text-secondary);
 }
 
+.badge-version {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    font-family: var(--font-mono);
+    font-size: 10px;
+}
+
 /* ============================================
    Server List
    ============================================ */
