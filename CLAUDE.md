@@ -28,6 +28,7 @@ Deterministic middleware decisions + LLM planning assists:
 
 | File | Purpose |
 |------|---------|
+| `docs/registry-schema.md` | **Unified registry schema** - servers, tools, virtual tools, outputSchema |
 | `docs/motivation.md` | High-level value proposition, MVA1 & MVA2 use cases |
 | `docs/manual-testing.md` | Guide for testing with local and remote MCP servers |
 | `docs/sidecar.md` | User-facing documentation for the sidecar proxy feature |
@@ -35,6 +36,7 @@ Deterministic middleware decisions + LLM planning assists:
 | `docs/phase2a-sidecar-proxy-plan.md` | Implementation plan for sidecar proxy |
 | `docs/tool-hints-plan.md` | Plan for capability/behavior hints (MVA2) |
 | `docs/tool-composition-exploration.md` | Future pipeline/composition exploration |
+| `docs/tool-versioning-testing.md` | Manual testing guide for tool versioning |
 | `demo/mcp-snapshots/README.md` | Real-world MCP server outputSchema analysis |
 | `demo/mcp-snapshots/memory-projection-expected.md` | JSONPath projection demo with server-memory |
 

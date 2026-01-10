@@ -2,11 +2,13 @@
 
 This guide describes how to manually test the MCP Gateway with both local and remote MCP servers.
 
+> **Note**: For detailed registry schema documentation, see [docs/registry-schema.md](registry-schema.md).
+
 ## Quick Start
 
 ```bash
 # Start gateway with demo registry
-uv run mcp-proxy --named-server-config demo/test_registry.json --port 8766
+uv run mcp-proxy --named-server-config demo/registries/showcase.json --port 8766
 
 # In another terminal, test the MCP endpoint
 curl -s -X POST http://127.0.0.1:8766/mcp/ \
@@ -23,14 +25,17 @@ The simplest test uses `mcp-server-fetch`, a stdio-based MCP server that fetches
 **Registry configuration** (`registry.json`):
 ```json
 {
+    "servers": [
+        {
+            "name": "fetch-server",
+            "stdio": {"command": "uvx", "args": ["mcp-server-fetch"]}
+        }
+    ],
     "tools": [
         {
             "name": "fetch",
+            "server": "fetch-server",
             "description": "Fetch content from a URL",
-            "server": {
-                "command": "uvx",
-                "args": ["mcp-server-fetch"]
-            },
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -84,10 +89,13 @@ Test the gateway's ability to rename tools using the `source` field:
 
 ```json
 {
+    "servers": [
+        {"name": "fetch-server", "stdio": {"command": "uvx", "args": ["mcp-server-fetch"]}}
+    ],
     "tools": [
         {
             "name": "fetch",
-            "server": {"command": "uvx", "args": ["mcp-server-fetch"]},
+            "server": "fetch-server",
             "inputSchema": {"type": "object", "properties": {"url": {"type": "string"}}}
         },
         {
@@ -224,6 +232,10 @@ Test the gateway with multiple backend servers:
 
 ```json
 {
+    "servers": [
+        {"name": "fetch-server", "stdio": {"command": "uvx", "args": ["mcp-server-fetch"]}},
+        {"name": "arxiv-server", "stdio": {"command": "python", "args": ["-m", "mcp_simple_arxiv"]}}
+    ],
     "schemas": {
         "UrlInput": {
             "type": "object",
@@ -239,14 +251,14 @@ Test the gateway with multiple backend servers:
     "tools": [
         {
             "name": "fetch_url",
+            "server": "fetch-server",
             "description": "Fetch webpage content",
-            "server": {"command": "uvx", "args": ["mcp-server-fetch"]},
             "inputSchema": {"$ref": "#/schemas/UrlInput"}
         },
         {
             "name": "search_papers",
+            "server": "arxiv-server",
             "description": "Search arXiv papers",
-            "server": {"command": "python", "args": ["-m", "mcp_simple_arxiv"]},
             "inputSchema": {"$ref": "#/schemas/SearchInput"}
         }
     ]

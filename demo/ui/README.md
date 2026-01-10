@@ -2,6 +2,8 @@
 
 A FastHTML web interface for exploring tool registries and testing MCP tools. The UI supports multiple backend gateways through a configurable adapter pattern.
 
+> **Registry Schema**: For detailed documentation on the unified registry format, see [docs/registry-schema.md](../../docs/registry-schema.md).
+
 ## Supported Backends
 
 The UI can work with two different MCP gateway implementations:
@@ -132,11 +134,35 @@ The UI will show "Agent Gateway (Rust)" in the status badge when connected.
 
 The UI supports multiple ways to load tool registries:
 
-1. **Sample Registry** - Built-in demo registry for testing
-2. **Local JSON files** - Upload or select from filesystem
-3. **From Gateway** (agentgateway only) - Fetch live registry via `/registry` endpoint
+1. **Local JSON files** - Select from `demo/registries/` directory
+2. **From Gateway** (agentgateway only) - Fetch live registry via `/registry` endpoint
 
-When using agentgateway, the "From Gateway" option fetches the registry directly from the running gateway and converts it to the UI's expected format.
+### Unified Registry Format
+
+Registries use a unified schema with separate sections:
+
+```json
+{
+  "servers": [
+    {"name": "fetch-server", "stdio": {"command": "uvx", "args": ["mcp-server-fetch"]}},
+    {"name": "remote-api", "url": "https://api.example.com/mcp", "transport": "streamablehttp"}
+  ],
+  "tools": [
+    {"name": "fetch", "server": "fetch-server", "inputSchema": {...}},
+    {"name": "get_webpage", "source": "fetch", "description": "Virtual tool"}
+  ]
+}
+```
+
+Key features:
+- **Named servers**: Defined once in `servers` section, referenced by name in tools
+- **Virtual tools**: Use `source` to inherit from other tools
+- **Version tracking**: Optional `version` field displayed as badges in UI
+- **Schema references**: Use `$ref` to reference shared schemas
+
+The UI handles both the new unified format and legacy inline server format for backwards compatibility.
+
+When using agentgateway, the "From Gateway" option fetches the registry directly and converts it to the UI's expected format.
 
 ## Architecture
 
