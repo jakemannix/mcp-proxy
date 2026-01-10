@@ -1,6 +1,28 @@
 # MCP Gateway Demo UI
 
-A FastHTML web interface for exploring tool registries and testing MCP tools. The UI supports multiple backend gateways through a configurable adapter pattern.
+A FastHTML web interface for **exploring tool registries** and testing MCP tools.
+
+## What This UI Is
+
+This is a **Registry Explorer** - it visualizes the *configuration* of an MCP Gateway, not just the runtime tool list. It shows:
+
+- **Server definitions** - Named backend configurations (stdio commands, remote URLs)
+- **Virtual tool relationships** - How tools inherit from other tools via `source`
+- **Schema transformations** - Output projections, hidden defaults, field mappings
+- **Version declarations** - Registry-declared versions (what the author claims, not runtime-validated)
+
+This is different from what an MCP client sees. An MCP client calling `tools/list` gets a flat list of tools with their schemas. This UI shows the *registry structure* that produces those tools - useful for understanding and debugging gateway configurations.
+
+### Design-Time vs Runtime
+
+| Aspect | What UI Shows | What MCP Client Sees |
+|--------|---------------|---------------------|
+| Tools | Full registry with `source` relationships | Flat tool list from `tools/list` |
+| Versions | Registry-declared `version` field | Not exposed via MCP |
+| Servers | Named server configurations | Invisible (gateway internal) |
+| Projections | `outputSchema` with `source_field` | Transformed output (projection applied) |
+
+The **Tool Tester** feature does call tools through the gateway at runtime, so you can verify the actual behavior matches the configuration.
 
 > **Registry Schema**: For detailed documentation on the unified registry format, see [docs/registry-schema.md](../../docs/registry-schema.md).
 
@@ -11,7 +33,7 @@ The UI can work with two different MCP gateway implementations:
 ### 1. MCP Proxy (Python) - Default
 
 **Repository**: `jakemannix/mcp-proxy`
-**Branch**: `mcp-gateway-prototype` (or `feature/tool-versioning`)
+**Branch**: `main`
 **Default URL**: `http://localhost:8080`
 
 The Python-based gateway from this repository. Uses JSON-RPC over HTTP at the `/mcp/` endpoint with session management.
