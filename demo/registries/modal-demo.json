@@ -1,0 +1,99 @@
+{
+  "$comment": "MCP Gateway Demo - Modal Deployment (Remote servers only)",
+  "tools": [
+    {
+      "$comment": "=== CLOUDFLARE DOCS - Remote MCP server (public, no auth) ===",
+      "name": "search_cloudflare_docs",
+      "description": "Search Cloudflare documentation - returns XML-like structured results",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query"}
+        },
+        "required": ["query"]
+      },
+      "server": {"url": "https://docs.mcp.cloudflare.com/mcp", "transport": "streamablehttp"},
+      "originalName": "search_cloudflare_documentation"
+    },
+    {
+      "name": "cf_docs",
+      "source": "search_cloudflare_docs",
+      "description": "DEMO: Simplified alias for Cloudflare docs search"
+    },
+    {
+      "$comment": "=== CLOUDFLARE RADAR - OAuth-protected remote MCP server ===",
+      "name": "get_trending_domains",
+      "description": "Get trending domains from Cloudflare Radar (requires OAuth)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {"type": "integer", "description": "Number of results (default 10)"},
+          "rankingType": {
+            "type": "string",
+            "enum": ["POPULAR", "TRENDING_RISE", "TRENDING_STEADY"],
+            "description": "Ranking type"
+          }
+        }
+      },
+      "server": {
+        "url": "https://radar.mcp.cloudflare.com/mcp",
+        "transport": "streamablehttp",
+        "auth": "oauth"
+      },
+      "originalName": "get_domains_ranking"
+    },
+    {
+      "name": "trending_domains",
+      "source": "get_trending_domains",
+      "description": "DEMO: Trending domains with clean output - extracts domain names and rank changes",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "source_field": "$.result.top_0[*]",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rank": {"type": "integer", "source_field": "$.rank"},
+                "domain": {"type": "string", "source_field": "$.domain"},
+                "change": {"type": "number", "source_field": "$.pctRankChange"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "get_ip_info",
+      "description": "Get IP address information from Cloudflare Radar (requires OAuth)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {"type": "string", "description": "IPv4 or IPv6 address"}
+        },
+        "required": ["ip"]
+      },
+      "server": {
+        "url": "https://radar.mcp.cloudflare.com/mcp",
+        "transport": "streamablehttp",
+        "auth": "oauth"
+      },
+      "originalName": "get_ip_details"
+    },
+    {
+      "name": "ip_lookup",
+      "source": "get_ip_info",
+      "description": "DEMO: Simplified IP lookup with projected output",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {"type": "string", "source_field": "$.ip"},
+          "asn": {"type": "integer", "source_field": "$.asn"},
+          "asn_name": {"type": "string", "source_field": "$.asnName"},
+          "location": {"type": "string", "source_field": "$.locationAlpha2"}
+        }
+      }
+    }
+  ]
+}

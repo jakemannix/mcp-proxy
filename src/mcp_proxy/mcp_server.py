@@ -36,6 +36,10 @@ from starlette.types import Receive, Scope, Send
 from .config_loader import ServerConfig, VirtualTool
 from .output_transformer import apply_output_projection, get_structured_content
 from .markdown_list_parser import extract_markdown_list
+from .tool_versioning import (
+    handle_validation_failure,
+    validate_backend_tools,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +159,43 @@ def create_single_instance_routes(
     return routes, http_session_manager
 
 
+async def _validate_all_backends(
+    active_backends: dict[str, "ClientSession"],
+    virtual_tools: list[VirtualTool],
+) -> None:
+    """Validate all backend tools against expected schemas.
+
+    Groups tools by server_id to minimize list_tools() calls (one per backend).
+    Updates validation_status on each VirtualTool based on results.
+    """
+    # Group tools by backend
+    tools_by_backend: dict[str, list[VirtualTool]] = {}
+    for tool in virtual_tools:
+        if tool.validation_mode != "skip" and tool.expected_schema_hash:
+            tools_by_backend.setdefault(tool.server_id, []).append(tool)
+
+    # Validate each backend
+    for server_id, tools in tools_by_backend.items():
+        if server_id not in active_backends:
+            logger.warning("Backend %s not connected, skipping validation", server_id)
+            continue
+
+        backend = active_backends[server_id]
+        logger.info("Validating %d tools against backend %s", len(tools), server_id[:8])
+
+        results = await validate_backend_tools(backend, tools, server_id)
+
+        for result in results:
+            # Find the tool and update its status
+            tool = next((t for t in tools if t.name == result.tool_name), None)
+            if tool:
+                tool.validation_status = result.status
+                tool.computed_schema_hash = result.actual_hash
+
+                if result.status != "valid":
+                    handle_validation_failure(tool, result)
+
+
 async def run_mcp_server(
     mcp_settings: MCPServerSettings,
     unique_servers: dict[str, ServerConfig],
@@ -222,6 +263,9 @@ async def run_mcp_server(
                 logger.exception("Failed to initialize backend server %s", server_id)
                 # We continue, but tools using this backend will fail
 
+        # Validate backend tools against expected schemas
+        await _validate_all_backends(active_backends, virtual_tools)
+
         # Create Aggregator Server
         gateway = MCPServerSDK("mcp-gateway")
 
@@ -242,6 +286,13 @@ async def run_mcp_server(
             tool = next((t for t in virtual_tools if t.name == name), None)
             if not tool:
                 raise ValueError(f"Tool not found: {name}")
+
+            # Check validation status (strict mode tools disabled on validation failure)
+            if tool.validation_mode == "strict" and tool.validation_status == "error":
+                raise RuntimeError(
+                    f"Tool '{name}' is disabled due to validation failure: "
+                    f"{tool.validation_message}"
+                )
 
             # Get backend
             backend = active_backends.get(tool.server_id)
@@ -390,6 +441,11 @@ async def run_mcp_server(
                 active_backends[server_id] = session
                 lazy_stacks[server_id] = lazy_stack
                 del oauth_pending[server_id]
+
+                # Validate tools for this newly connected backend
+                tools_for_backend = [t for t in virtual_tools if t.server_id == server_id]
+                if tools_for_backend:
+                    await _validate_all_backends({server_id: session}, tools_for_backend)
 
                 logger.info("Successfully connected OAuth backend: %s", config.url)
                 return JSONResponse({"status": "connected", "server_url": server_url})

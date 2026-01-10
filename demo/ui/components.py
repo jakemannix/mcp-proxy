@@ -16,6 +16,7 @@ def ToolCard(tool: dict, selected: bool = False, oauth_required: bool = False, o
     """
     name = tool.get("name", "unknown")
     source = tool.get("source")
+    version = tool.get("version")
     has_projection = "outputSchema" in tool
     defaults = tool.get("defaults", {})
     has_defaults = bool(defaults)
@@ -79,6 +80,9 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
     """
     name = tool.get("name", "unknown")
     source = tool.get("source")
+    version = tool.get("version")
+    source_version_pin = tool.get("sourceVersionPin")
+    validation_mode = tool.get("validationMode", "warn")
     description = tool.get("description", "No description provided")
     input_schema = tool.get("inputSchema", {})
     output_schema = tool.get("outputSchema")
@@ -92,8 +96,18 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
 
     # Header section
     header_badges = []
+    if version:
+        header_badges.append(Span(f"v{version}", cls="header-badge badge-version"))
     if is_text_to_structured:
         header_badges.append(Span("Text → Structured JSON", cls="header-badge badge-text-extract"))
+
+    # Build source info with version pin
+    source_info = None
+    if source:
+        if source_version_pin:
+            source_info = Span(f"Source: {source} (pinned to v{source_version_pin})", cls="detail-source")
+        else:
+            source_info = Span(f"Source: {source}", cls="detail-source")
 
     sections.append(
         Div(
@@ -103,7 +117,7 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
                 *header_badges,
                 cls="detail-header-row"
             ),
-            Span(f"Source: {source}", cls="detail-source") if source else None,
+            source_info,
             cls="detail-header"
         )
     )
@@ -398,12 +412,65 @@ def ChatPanel(messages: list = None, scenarios: list = None):
         Option(name, value=key) for key, name in scenarios
     ])
 
+    # JavaScript for localStorage API key management
+    api_key_script = Script("""
+        // Load API key from localStorage on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedKey = localStorage.getItem('openrouter_api_key');
+            const input = document.getElementById('api-key-input');
+            if (savedKey && input) {
+                input.value = savedKey;
+            }
+        });
+
+        // Save API key to localStorage when changed
+        function saveApiKey(input) {
+            if (input.value) {
+                localStorage.setItem('openrouter_api_key', input.value);
+            } else {
+                localStorage.removeItem('openrouter_api_key');
+            }
+        }
+
+        // Add API key header to HTMX requests for chat
+        document.body.addEventListener('htmx:configRequest', function(evt) {
+            if (evt.detail.path === '/agent/send') {
+                const apiKey = localStorage.getItem('openrouter_api_key');
+                if (apiKey) {
+                    evt.detail.headers['X-OpenRouter-Key'] = apiKey;
+                }
+            }
+        });
+    """)
+
+    # API key input section
+    api_key_section = Div(
+        Div(
+            UkIcon("key", height=14, width=14),
+            Span("OpenRouter API Key", cls="label-text"),
+            A("(get one)", href="https://openrouter.ai/keys", target="_blank", cls="api-key-link"),
+            cls="api-key-label"
+        ),
+        Input(
+            type="password",
+            id="api-key-input",
+            placeholder="sk-or-...",
+            cls="api-key-input",
+            onchange="saveApiKey(this)",
+            oninput="saveApiKey(this)"
+        ),
+        P("Stored in your browser only. Never sent to our server except for LLM calls.", cls="api-key-hint"),
+        cls="api-key-section"
+    )
+
     return Div(
+        api_key_script,
         Div(
             UkIcon("bot", height=16, width=16),
             Span("Agent Chat", cls="section-title"),
             cls="section-header"
         ),
+        api_key_section,
         Div(*message_elements, id="chat-messages", cls="chat-messages"),
         Form(
             Textarea(
