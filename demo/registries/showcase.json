@@ -30,7 +30,7 @@
   "tools": [
     {
       "name": "fetch",
-      "version": "1.0.0",
+      "version": "2.1.0",
       "description": "Original fetch tool from mcp-server-fetch",
       "inputSchema": {"$ref": "#/schemas/FetchInput"},
       "server": {"command": "uvx", "args": ["mcp-server-fetch"]},
@@ -38,14 +38,14 @@
     },
     {
       "name": "get_webpage",
-      "version": "1.0.0",
+      "version": "2.1.1",
       "source": "fetch",
-      "sourceVersionPin": "1.0.0",
+      "sourceVersionPin": "2.1.0",
       "description": "DEMO: Renamed fetch tool - retrieves content from a URL with semantic naming"
     },
     {
       "name": "read_graph",
-      "version": "1.0.0",
+      "version": "3.0.0",
       "description": "Read the entire knowledge graph",
       "inputSchema": {"type": "object", "properties": {}},
       "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]},
@@ -53,9 +53,9 @@
     },
     {
       "name": "list_entity_names",
-      "version": "1.0.0",
+      "version": "3.0.1",
       "source": "read_graph",
-      "sourceVersionPin": "1.0.0",
+      "sourceVersionPin": "3.0.0",
       "description": "DEMO: Projected output - extracts just entity names from knowledge graph",
       "inputSchema": {"type": "object", "properties": {}},
       "outputSchema": {
@@ -71,7 +71,9 @@
     },
     {
       "name": "get_connections",
+      "version": "3.0.2",
       "source": "read_graph",
+      "sourceVersionPin": "3.0.0",
       "description": "DEMO: RDF-style triple projection from knowledge graph relations",
       "inputSchema": {"type": "object", "properties": {}},
       "outputSchema": {
@@ -94,18 +96,22 @@
     },
     {
       "name": "create_entities",
+      "version": "3.0.0",
       "description": "Create new entities in the knowledge graph",
       "inputSchema": {"$ref": "#/schemas/EntityInput"},
       "server": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}
     },
     {
       "name": "remember",
+      "version": "1.0.0",
       "source": "create_entities",
+      "sourceVersionPin": "3.0.0",
       "description": "DEMO: Simplified alias for storing information in memory"
     },
     {
       "$comment": "=== TIME SERVER - JSON-in-text extraction demos ===",
       "name": "get_current_time",
+      "version": "1.2.0",
       "description": "Get current time - returns JSON embedded in text (no structuredContent)",
       "inputSchema": {
         "type": "object",
@@ -121,7 +127,9 @@
     },
     {
       "name": "get_time_structured",
+      "version": "1.2.1",
       "source": "get_current_time",
+      "sourceVersionPin": "1.2.0",
       "description": "DEMO: JSON extraction - auto-extracts JSON from text into structuredContent",
       "outputSchema": {
         "type": "object",
@@ -135,7 +143,9 @@
     },
     {
       "name": "what_day_is_it",
+      "version": "1.0.0",
       "source": "get_current_time",
+      "sourceVersionPin": "1.2.0",
       "description": "DEMO: JSON extraction + projection - extracts and projects to just day name",
       "outputSchema": {
         "type": "object",
@@ -146,6 +156,7 @@
     },
     {
       "name": "convert_time",
+      "version": "1.2.0",
       "description": "Convert time between timezones - returns nested JSON in text",
       "inputSchema": {
         "type": "object",
@@ -160,7 +171,9 @@
     },
     {
       "name": "timezone_offset",
+      "version": "1.0.0",
       "source": "convert_time",
+      "sourceVersionPin": "1.2.0",
       "description": "DEMO: Nested JSON projection - extracts time_difference from nested structure",
       "outputSchema": {
         "type": "object",
@@ -174,6 +187,7 @@
     {
       "$comment": "=== CLOUDFLARE DOCS - Remote MCP server (public, no auth) ===",
       "name": "search_cloudflare_docs",
+      "version": "0.9.0",
       "description": "Search Cloudflare documentation - returns XML-like structured results",
       "inputSchema": {
         "type": "object",
@@ -188,6 +202,7 @@
     {
       "$comment": "=== GITHUB SERVER - JSON extraction from API responses ===",
       "name": "search_repositories",
+      "version": "1.5.0",
       "description": "Search GitHub repositories - returns full JSON response",
       "inputSchema": {
         "type": "object",
@@ -201,7 +216,9 @@
     },
     {
       "name": "search_repos",
+      "version": "1.5.1",
       "source": "search_repositories",
+      "sourceVersionPin": "1.5.0",
       "description": "DEMO: GitHub search with clean output - extracts repo names, descriptions, and URLs",
       "outputSchema": {
         "type": "object",
@@ -226,7 +243,7 @@
     {
       "$comment": "=== CLOUDFLARE RADAR - OAuth-protected remote MCP server ===",
       "name": "get_trending_domains",
-      "version": "1.0.0",
+      "version": "0.8.0",
       "description": "Get trending domains from Cloudflare Radar (requires OAuth)",
       "inputSchema": {
         "type": "object",
@@ -249,7 +266,9 @@
     },
     {
       "name": "trending_domains",
+      "version": "0.8.1",
       "source": "get_trending_domains",
+      "sourceVersionPin": "0.8.0",
       "description": "DEMO: Trending domains with clean output - extracts domain names and rank changes",
       "outputSchema": {
         "type": "object",
@@ -271,6 +290,7 @@
     },
     {
       "name": "get_ip_info",
+      "version": "0.8.0",
       "description": "Get IP address information from Cloudflare Radar (requires OAuth)",
       "inputSchema": {
         "type": "object",
