@@ -170,11 +170,28 @@ def load_registry_from_file(
         if not server_ref:
             raise ValueError(f"Tool '{name}' has no server reference and no valid source.")
 
-        # Look up server by name
-        if server_ref not in named_servers:
-            raise ValueError(f"Tool '{name}' references unknown server '{server_ref}'")
-
-        server_config = named_servers[server_ref]
+        # Handle both new format (string reference) and old format (inline dict)
+        if isinstance(server_ref, str):
+            # New format: look up server by name
+            if server_ref not in named_servers:
+                raise ValueError(f"Tool '{name}' references unknown server '{server_ref}'")
+            server_config = named_servers[server_ref]
+        elif isinstance(server_ref, dict):
+            # Old format: inline server definition
+            env_list = []
+            if "env" in server_ref:
+                for k, v in server_ref["env"].items():
+                    env_list.append((k, v))
+            server_config = ServerConfig(
+                command=server_ref.get("command"),
+                args=tuple(server_ref.get("args", [])),
+                url=server_ref.get("url"),
+                transport=server_ref.get("transport", "sse"),
+                env=tuple(sorted(env_list)),
+                auth=server_ref.get("auth", "none"),
+            )
+        else:
+            raise ValueError(f"Tool '{name}' has invalid server reference type: {type(server_ref)}")
 
         if server_config.id not in unique_servers:
             unique_servers[server_config.id] = server_config

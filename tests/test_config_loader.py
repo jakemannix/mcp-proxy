@@ -343,7 +343,7 @@ def test_tool_missing_server_and_source(
     }
     tmp_config_path = create_temp_config_file(config_content)
 
-    with pytest.raises(ValueError, match="has no server configuration"):
+    with pytest.raises(ValueError, match="has no server reference and no valid source"):
         load_registry_from_file(tmp_config_path, {})
 
 
