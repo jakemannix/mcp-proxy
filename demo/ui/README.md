@@ -117,30 +117,41 @@ git checkout feature/virtual_tools_and_registry
 # Build the Rust gateway
 cargo build --release
 
-# Start with a registry config
-./target/release/agentgateway --config path/to/config.yaml
+# Start with the demo config (from mcp-gateway-prototype root)
+cd /path/to/mcp-gateway-prototype
+./path/to/agentgateway/target/release/agentgateway -f demo/agentgateway-demo.yaml
 ```
 
-Note: agentgateway configuration format differs from mcp-proxy. See the agentgateway documentation for config file structure.
+The demo config (`demo/agentgateway-demo.yaml`) is pre-configured with:
+- CORS headers for the demo UI
+- Local stdio servers (fetch, memory, time, github)
+- Remote server (cloudflare-docs)
+- Registry pointing to `showcase.json` for virtual tool mappings
 
 ### 2. Start the UI with agentgateway backend
 
 ```bash
-cd /path/to/mcp-proxy/demo/ui
+cd /path/to/mcp-gateway-prototype/demo/ui
 
-# Configure for agentgateway
+# Configure for agentgateway (port 3000 as in demo config)
 export GATEWAY_BACKEND=agentgateway
-export GATEWAY_URL=http://localhost:15000
+export GATEWAY_URL=http://localhost:3000
 
 uv run python main.py
 ```
 
 ### 3. Access the UI
 
-- Gateway: http://localhost:15000 (or your configured port)
+- Gateway: http://localhost:3000
 - UI: http://localhost:5001
 
 The UI will show "Agent Gateway (Rust)" in the status badge when connected.
+
+### Architecture Note
+
+The agentgateway loads virtual tool mappings from the registry (`showcase.json`), which defines how tools are renamed, have outputs projected, etc. The MCP server processes are defined in the YAML config and started when agentgateway launches.
+
+Future versions will allow the registry to be the sole source of truth for both server definitions and tool mappings.
 
 ## Feature Differences by Backend
 

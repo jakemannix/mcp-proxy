@@ -284,7 +284,11 @@ class AgentGatewayBackend(GatewayBackend):
                     headers={**mcp_headers, "Mcp-Session-Id": session_id},
                     timeout=60.0
                 )
-                return resp.json()
+                # Handle SSE format (data: {...}) or raw JSON
+                body = resp.text.strip()
+                if body.startswith("data: "):
+                    body = body[6:]  # Strip "data: " prefix
+                return json.loads(body)
         except Exception as e:
             return {"error": str(e)}
 
@@ -337,7 +341,11 @@ class AgentGatewayBackend(GatewayBackend):
                     headers={**mcp_headers, "Mcp-Session-Id": session_id},
                     timeout=30.0
                 )
-                result = resp.json()
+                # Handle SSE format (data: {...}) or raw JSON
+                body = resp.text.strip()
+                if body.startswith("data: "):
+                    body = body[6:]  # Strip "data: " prefix
+                result = json.loads(body)
                 return result.get("result", {}).get("tools", [])
         except Exception as e:
             logger.error(f"Failed to list tools: {e}")
