@@ -406,15 +406,28 @@ def get_backend(gateway_url: Optional[str] = None) -> GatewayBackend:
 # Registry helpers that work with both backends
 
 def load_registry_from_file(path: str) -> dict:
-    """Load a registry JSON file and resolve schema references and source inheritance.
+    """Load a registry JSON file, auto-detecting format.
 
-    This is used for local registry files (mcp-proxy style).
+    Supports both:
+    - agentgateway format: source: {target: "...", tool: "..."}
+    - mcp-proxy format: server: "...", source: "..." (string reference)
     """
     try:
         with open(path) as f:
             registry = json.load(f)
 
+        # Detect format by checking if any tool has source as an object
         tools = registry.get("tools", [])
+        is_agentgateway_format = any(
+            isinstance(t.get("source"), dict) or t.get("spec") is not None
+            for t in tools
+        )
+
+        if is_agentgateway_format:
+            # Convert agentgateway format to UI format
+            return convert_agentgateway_registry(registry)
+
+        # Otherwise, process as mcp-proxy format
         schemas = registry.get("schemas", {})
 
         # Build lookup by name
@@ -454,6 +467,7 @@ def convert_agentgateway_registry(ag_registry: dict) -> dict:
         {
             "schema_version": "1.0",
             "tools": [
+                # Virtual tool (source-based):
                 {
                     "name": "tool_name",
                     "source": {"target": "backend", "tool": "original_name"},
@@ -461,31 +475,58 @@ def convert_agentgateway_registry(ag_registry: dict) -> dict:
                     "input_schema": {...},
                     "defaults": {...},
                     "hide_fields": [...],
-                    "output_schema": {...},
+                    "output_transform": {...},
                     "version": "1.0.0",
                     "metadata": {...}
+                },
+                # Composition tool (spec-based):
+                {
+                    "name": "composition_name",
+                    "spec": {
+                        "pipeline": { "steps": [...] }
+                        # or "scatterGather": {...}
+                        # or "filter": {...}
+                        # etc.
+                    },
+                    "description": "...",
+                    ...
                 }
             ]
         }
 
-    MCP-proxy registry format:
+    MCP-proxy registry format (extended for compositions):
         {
             "tools": [
                 {
                     "name": "tool_name",
-                    "source": "original_name",  # string, not object
+                    "source": "original_name",  # string for virtual tools
                     "description": "...",
                     "inputSchema": {...},  # camelCase
                     "defaults": {...},
                     "hide_fields": [...],
                     "outputSchema": {...},  # camelCase
-                    "server": {"command": "...", "url": "..."}  # backend info
+                    "server": {"target": "..."},  # backend info
+                    # For compositions:
+                    "composition": {
+                        "type": "pipeline|scatter_gather|filter|...",
+                        "spec": {...}  # original spec for display
+                    }
                 }
             ]
         }
     """
     if not ag_registry:
         return {"tools": []}
+
+    # First pass: Build lookup of inputSchema by backend reference (target, tool)
+    schema_by_backend: dict[tuple[str, str], dict] = {}
+    for tool in ag_registry.get("tools", []):
+        source = tool.get("source")
+        input_schema = tool.get("input_schema") or tool.get("inputSchema")
+        if isinstance(source, dict) and input_schema:
+            key = (source.get("target"), source.get("tool"))
+            if key not in schema_by_backend:
+                schema_by_backend[key] = input_schema
 
     converted_tools = []
     for tool in ag_registry.get("tools", []):
@@ -494,26 +535,55 @@ def convert_agentgateway_registry(ag_registry: dict) -> dict:
             "description": tool.get("description"),
         }
 
-        # Convert source object to string + server info
-        source = tool.get("source", {})
-        if isinstance(source, dict):
-            converted["source"] = source.get("tool")
-            # Store target as virtual server reference
-            converted["server"] = {"target": source.get("target")}
-        elif isinstance(source, str):
-            converted["source"] = source
+        # Check if this is a composition (has spec) or virtual tool (has source)
+        spec = tool.get("spec")
+        source = tool.get("source")
+
+        if spec:
+            # This is a composition tool
+            composition_type = _get_composition_type(spec)
+            converted["composition"] = {
+                "type": composition_type,
+                "spec": spec
+            }
+            # Extract referenced tools from the spec
+            referenced = _extract_referenced_tools(spec)
+            if referenced:
+                converted["referencedTools"] = referenced
+        elif source:
+            # This is a virtual tool (source-based)
+            if isinstance(source, dict):
+                # agentgateway format: source is {target, tool} - a backend reference
+                # Don't set "source" as that means registry tool reference in mcp-proxy
+                converted["server"] = source.get("target")
+                converted["backendTool"] = source.get("tool")
+            elif isinstance(source, str):
+                # mcp-proxy format: source is a registry tool name reference
+                converted["source"] = source
 
         # Convert snake_case to camelCase for schemas
-        if tool.get("input_schema"):
-            converted["inputSchema"] = tool["input_schema"]
-        if tool.get("output_schema"):
-            converted["outputSchema"] = tool["output_schema"]
+        input_schema = tool.get("input_schema") or tool.get("inputSchema")
+        if input_schema:
+            converted["inputSchema"] = input_schema
+        elif isinstance(source, dict):
+            # Inherit inputSchema from another tool with same backend reference
+            key = (source.get("target"), source.get("tool"))
+            if key in schema_by_backend:
+                converted["inputSchema"] = schema_by_backend[key]
+
+        # Handle outputSchema (JSON Schema) and outputTransform (mappings) separately
+        # Both can coexist - outputSchema describes shape, outputTransform describes how to generate
+        if tool.get("output_schema") or tool.get("outputSchema"):
+            converted["outputSchema"] = tool.get("output_schema") or tool.get("outputSchema")
+        if tool.get("output_transform") or tool.get("outputTransform"):
+            transform = tool.get("output_transform") or tool.get("outputTransform")
+            converted["outputTransform"] = transform
 
         # Copy other fields as-is
         if tool.get("defaults"):
             converted["defaults"] = tool["defaults"]
-        if tool.get("hide_fields"):
-            converted["hide_fields"] = tool["hide_fields"]
+        if tool.get("hide_fields") or tool.get("hideFields"):
+            converted["hide_fields"] = tool.get("hide_fields") or tool.get("hideFields")
         if tool.get("version"):
             converted["version"] = tool["version"]
         if tool.get("metadata"):
@@ -522,3 +592,47 @@ def convert_agentgateway_registry(ag_registry: dict) -> dict:
         converted_tools.append(converted)
 
     return {"tools": converted_tools}
+
+
+def _get_composition_type(spec: dict) -> str:
+    """Extract the composition type from a spec dict."""
+    if "pipeline" in spec:
+        return "pipeline"
+    elif "scatterGather" in spec or "scatter_gather" in spec:
+        return "scatter_gather"
+    elif "filter" in spec:
+        return "filter"
+    elif "schemaMap" in spec or "schema_map" in spec:
+        return "schema_map"
+    elif "mapEach" in spec or "map_each" in spec:
+        return "map_each"
+    elif "retry" in spec:
+        return "retry"
+    elif "timeout" in spec:
+        return "timeout"
+    elif "cache" in spec:
+        return "cache"
+    else:
+        return "unknown"
+
+
+def _extract_referenced_tools(spec: dict) -> list[str]:
+    """Extract tool names referenced in a composition spec."""
+    tools = []
+
+    def extract_from_value(val):
+        if isinstance(val, dict):
+            # Check for tool reference
+            if "tool" in val and isinstance(val["tool"], dict) and "name" in val["tool"]:
+                tools.append(val["tool"]["name"])
+            elif "tool" in val and isinstance(val["tool"], str):
+                tools.append(val["tool"])
+            # Recurse into nested dicts
+            for v in val.values():
+                extract_from_value(v)
+        elif isinstance(val, list):
+            for item in val:
+                extract_from_value(item)
+
+    extract_from_value(spec)
+    return list(set(tools))  # Deduplicate

@@ -17,11 +17,12 @@ def ToolCard(tool: dict, selected: bool = False, oauth_required: bool = False, o
     name = tool.get("name", "unknown")
     source = tool.get("source")
     version = tool.get("version")
-    has_projection = "outputSchema" in tool
+    has_projection = "outputSchema" in tool or "outputTransform" in tool
     defaults = tool.get("defaults", {})
     has_defaults = bool(defaults)
     server = tool.get("server")
-    version = tool.get("version")
+    composition = tool.get("composition")
+    referenced_tools = tool.get("referencedTools", [])
 
     # Detect if this is a virtual tool that structures text output
     is_text_to_structured = source and has_projection and not server
@@ -29,14 +30,38 @@ def ToolCard(tool: dict, selected: bool = False, oauth_required: bool = False, o
     badges = []
     if version:
         badges.append(Span(f"v{version}", cls="badge badge-version"))
-    if is_text_to_structured:
+
+    # Composition badge takes precedence
+    if composition:
+        comp_type = composition.get("type", "composition")
+        comp_labels = {
+            "pipeline": "pipeline",
+            "scatter_gather": "scatter",
+            "filter": "filter",
+            "schema_map": "transform",
+            "map_each": "map",
+            "retry": "retry",
+            "timeout": "timeout",
+            "cache": "cache",
+        }
+        label = comp_labels.get(comp_type, comp_type)
+        badges.append(Span(label, cls="badge badge-composition"))
+        if referenced_tools:
+            badges.append(Span(f"{len(referenced_tools)} tools", cls="badge badge-tools-count"))
+    elif is_text_to_structured:
         badges.append(Span("text→json", cls="badge badge-text-extract"))
     elif has_projection:
         badges.append(Span("projection", cls="badge badge-projection"))
+
     if has_defaults:
         badges.append(Span(f"{len(defaults)} hidden", cls="badge badge-hidden"))
     if source:
         badges.append(Span(f"→ {source}", cls="badge badge-source"))
+
+    # Show backend reference for agentgateway format tools
+    backend_tool = tool.get("backendTool")
+    if backend_tool and server:
+        badges.append(Span(f"{server}:{backend_tool}", cls="badge badge-backend"))
 
     # OAuth status indicator
     oauth_indicator = None
@@ -86,11 +111,15 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
     description = tool.get("description", "No description provided")
     input_schema = tool.get("inputSchema", {})
     output_schema = tool.get("outputSchema")
+    output_transform = tool.get("outputTransform")
     defaults = tool.get("defaults", {})
     server = tool.get("server")
+    composition = tool.get("composition")
+    referenced_tools = tool.get("referencedTools", [])
 
     # Detect if this is a virtual tool that structures text output
     is_text_to_structured = source and output_schema and not server
+    is_composition = composition is not None
 
     sections = []
 
@@ -98,7 +127,21 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
     header_badges = []
     if version:
         header_badges.append(Span(f"v{version}", cls="header-badge badge-version"))
-    if is_text_to_structured:
+    if is_composition:
+        comp_type = composition.get("type", "composition")
+        comp_labels = {
+            "pipeline": "Pipeline Composition",
+            "scatter_gather": "Scatter-Gather Composition",
+            "filter": "Filter Pattern",
+            "schema_map": "Schema Transform",
+            "map_each": "Map-Each Pattern",
+            "retry": "Retry Pattern",
+            "timeout": "Timeout Pattern",
+            "cache": "Cache Pattern",
+        }
+        label = comp_labels.get(comp_type, f"{comp_type} Composition")
+        header_badges.append(Span(label, cls="header-badge badge-composition"))
+    elif is_text_to_structured:
         header_badges.append(Span("Text → Structured JSON", cls="header-badge badge-text-extract"))
 
     # Build source info with version pin
@@ -108,6 +151,11 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
             source_info = Span(f"Source: {source} (pinned to v{source_version_pin})", cls="detail-source")
         else:
             source_info = Span(f"Source: {source}", cls="detail-source")
+
+    # Backend reference for agentgateway format
+    backend_tool = tool.get("backendTool")
+    if backend_tool and server:
+        source_info = Span(f"Backend: {server} → {backend_tool}", cls="detail-source")
 
     sections.append(
         Div(
@@ -152,8 +200,24 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
             )
         )
 
+    # Composition structure display
+    if is_composition:
+        comp_type = composition.get("type", "unknown")
+        spec = composition.get("spec", {})
+        sections.append(
+            Div(
+                Div(
+                    UkIcon("git-merge", height=14, width=14),
+                    Span("Composition Structure", cls="label-text"),
+                    cls="detail-label"
+                ),
+                format_composition_spec(comp_type, spec, referenced_tools),
+                cls="detail-section"
+            )
+        )
+
     # Text-to-Structured explanation
-    if is_text_to_structured:
+    elif is_text_to_structured:
         sections.append(
             Div(
                 Div(
@@ -254,6 +318,20 @@ def ToolDetail(tool: dict, oauth_required: bool = False, oauth_authenticated: bo
                 cls="detail-section"
             )
         )
+    elif output_transform:
+        # New output transform format
+        transform_html = format_output_transform(output_transform)
+        sections.append(
+            Div(
+                Div(
+                    UkIcon("filter", height=14, width=14),
+                    Span("Output Transform", cls="label-text"),
+                    cls="detail-label"
+                ),
+                transform_html,
+                cls="detail-section"
+            )
+        )
 
     # Test Form section
     test_form = build_test_form(name, input_schema)
@@ -295,6 +373,244 @@ def format_output_schema(schema: dict, indent: int = 0) -> str:
                 lines.append(f"{prefix}<span class='schema-key'>{key}:</span> <span class='schema-value'>{json.dumps(value)}</span>")
 
     return "\n".join(lines)
+
+
+def format_composition_spec(comp_type: str, spec: dict, referenced_tools: list) -> Div:
+    """Format a composition specification for display."""
+
+    if comp_type == "pipeline":
+        return format_pipeline(spec.get("pipeline", {}))
+    elif comp_type == "scatter_gather":
+        sg_spec = spec.get("scatterGather") or spec.get("scatter_gather", {})
+        return format_scatter_gather(sg_spec)
+    elif comp_type == "filter":
+        return format_filter(spec.get("filter", {}))
+    elif comp_type == "map_each":
+        me_spec = spec.get("mapEach") or spec.get("map_each", {})
+        return format_map_each(me_spec)
+    else:
+        # Generic JSON display for unknown types
+        return Div(
+            Pre(json.dumps(spec, indent=2), cls="schema-box composition-spec"),
+            cls="composition-box"
+        )
+
+
+def format_pipeline(pipeline: dict) -> Div:
+    """Format a pipeline composition."""
+    steps = pipeline.get("steps", [])
+
+    step_elements = []
+    for i, step in enumerate(steps):
+        step_id = step.get("id", f"step_{i+1}")
+        operation = step.get("operation", {})
+
+        # Extract tool name from operation
+        tool_info = operation.get("tool", {})
+        if isinstance(tool_info, dict):
+            tool_name = tool_info.get("name", "?")
+        elif isinstance(tool_info, str):
+            tool_name = tool_info
+        else:
+            # Check if it's a nested pattern
+            tool_name = "[pattern]"
+
+        step_elements.append(
+            Div(
+                Span(str(i + 1), cls="step-num"),
+                Div(
+                    Span(step_id, cls="step-id"),
+                    Span(f"→ {tool_name}", cls="step-tool"),
+                    cls="step-info"
+                ),
+                cls="pipeline-step"
+            )
+        )
+
+        # Add arrow between steps (except after last)
+        if i < len(steps) - 1:
+            step_elements.append(
+                Div(UkIcon("arrow-down", height=16, width=16), cls="step-arrow-down")
+            )
+
+    return Div(
+        Div(
+            P("Steps execute in sequence, each receiving output from the previous.", cls="composition-desc"),
+            cls="composition-intro"
+        ),
+        Div(*step_elements, cls="pipeline-flow"),
+        cls="composition-box"
+    )
+
+
+def format_scatter_gather(sg: dict) -> Div:
+    """Format a scatter-gather composition."""
+    targets = sg.get("targets", [])
+    aggregation = sg.get("aggregation", {})
+    timeout_ms = sg.get("timeout_ms") or sg.get("timeoutMs")
+    fail_fast = sg.get("fail_fast") or sg.get("failFast", False)
+
+    # Extract target names
+    target_elements = []
+    for target in targets:
+        if isinstance(target, dict):
+            if "tool" in target:
+                tool_name = target["tool"] if isinstance(target["tool"], str) else target["tool"].get("name", "?")
+                target_elements.append(
+                    Span(tool_name, cls="scatter-target")
+                )
+            elif "pattern" in target:
+                target_elements.append(
+                    Span("[pattern]", cls="scatter-target scatter-pattern")
+                )
+        elif isinstance(target, str):
+            target_elements.append(
+                Span(target, cls="scatter-target")
+            )
+
+    # Format aggregation ops
+    agg_ops = aggregation.get("ops", [])
+    agg_labels = []
+    for op in agg_ops:
+        if isinstance(op, dict):
+            if "flatten" in op:
+                agg_labels.append("flatten")
+            elif "sort" in op:
+                agg_labels.append("sort")
+            elif "dedupe" in op:
+                agg_labels.append("dedupe")
+            elif "limit" in op:
+                agg_labels.append(f"limit({op['limit'].get('count', '?')})")
+            elif "merge" in op:
+                agg_labels.append("merge")
+
+    return Div(
+        Div(
+            P("Fan-out to multiple tools in parallel, then aggregate results.", cls="composition-desc"),
+            cls="composition-intro"
+        ),
+        Div(
+            Div(
+                Span("Input", cls="sg-label"),
+                UkIcon("arrow-down", height=14, width=14),
+                cls="sg-input"
+            ),
+            Div(
+                *[Div(t, UkIcon("arrow-down", height=12, width=12), cls="sg-branch") for t in target_elements],
+                cls="sg-branches"
+            ),
+            Div(
+                Span("Aggregate", cls="sg-label"),
+                Span(", ".join(agg_labels) if agg_labels else "concat", cls="sg-agg-ops"),
+                cls="sg-aggregate"
+            ),
+            cls="scatter-gather-flow"
+        ),
+        Div(
+            Span(f"Timeout: {timeout_ms}ms", cls="sg-config") if timeout_ms else None,
+            Span(f"Fail-fast: {fail_fast}", cls="sg-config"),
+            cls="sg-config-row"
+        ) if timeout_ms or fail_fast else None,
+        cls="composition-box"
+    )
+
+
+def format_filter(filter_spec: dict) -> Div:
+    """Format a filter pattern."""
+    predicate = filter_spec.get("predicate", {})
+    field = predicate.get("field", "?")
+    op = predicate.get("op", "?")
+    value = predicate.get("value", "?")
+
+    return Div(
+        Div(
+            P("Filter array elements based on a predicate.", cls="composition-desc"),
+            cls="composition-intro"
+        ),
+        Div(
+            Code(f"{field} {op} {json.dumps(value)}", cls="filter-predicate"),
+            cls="filter-display"
+        ),
+        cls="composition-box"
+    )
+
+
+def format_map_each(me_spec: dict) -> Div:
+    """Format a map-each pattern."""
+    inner = me_spec.get("inner", {})
+
+    if isinstance(inner, str):
+        inner_desc = f"tool: {inner}"
+    elif isinstance(inner, dict):
+        if "tool" in inner:
+            inner_desc = f"tool: {inner['tool']}"
+        else:
+            inner_desc = "[nested pattern]"
+    else:
+        inner_desc = str(inner)
+
+    return Div(
+        Div(
+            P("Apply an operation to each element of an array.", cls="composition-desc"),
+            cls="composition-intro"
+        ),
+        Div(
+            Span("[", cls="array-bracket"),
+            Span("item", cls="array-item"),
+            Span("]", cls="array-bracket"),
+            UkIcon("arrow-right", height=14, width=14),
+            Span(inner_desc, cls="map-each-inner"),
+            UkIcon("arrow-right", height=14, width=14),
+            Span("[", cls="array-bracket"),
+            Span("result", cls="array-item"),
+            Span("]", cls="array-bracket"),
+            cls="map-each-flow"
+        ),
+        cls="composition-box"
+    )
+
+
+def format_output_transform(transform: dict) -> Div:
+    """Format an output transform specification."""
+    mappings = transform.get("mappings", {})
+
+    if not mappings:
+        return Pre("{}", cls="schema-box schema-projection")
+
+    rows = []
+    for field_name, source in mappings.items():
+        if isinstance(source, dict):
+            if "path" in source:
+                source_desc = Span(source["path"], cls="transform-path")
+            elif "literal" in source:
+                lit = source["literal"]
+                if "stringValue" in lit:
+                    source_desc = Span(f'"{lit["stringValue"]}"', cls="transform-literal")
+                elif "numberValue" in lit:
+                    source_desc = Span(str(lit["numberValue"]), cls="transform-literal")
+                elif "boolValue" in lit:
+                    source_desc = Span(str(lit["boolValue"]).lower(), cls="transform-literal")
+                else:
+                    source_desc = Span(json.dumps(lit), cls="transform-literal")
+            elif "template" in source:
+                source_desc = Span(f'template: {source["template"]}', cls="transform-template")
+            else:
+                source_desc = Span(json.dumps(source), cls="transform-other")
+        elif isinstance(source, str):
+            source_desc = Span(source, cls="transform-path")
+        else:
+            source_desc = Span(str(source), cls="transform-other")
+
+        rows.append(
+            Div(
+                Span(field_name, cls="transform-field-name"),
+                UkIcon("arrow-left", height=12, width=12, cls="transform-arrow"),
+                source_desc,
+                cls="transform-row"
+            )
+        )
+
+    return Div(*rows, cls="transform-mappings")
 
 
 def build_test_form(tool_name: str, input_schema: dict):

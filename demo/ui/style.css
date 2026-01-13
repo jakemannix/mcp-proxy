@@ -323,6 +323,13 @@ html, body {
     color: var(--text-secondary);
 }
 
+.badge-backend {
+    background: var(--bg-tertiary);
+    color: var(--accent-info);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+}
+
 .badge-version {
     background: rgba(16, 185, 129, 0.15);
     color: #10b981;
@@ -1085,4 +1092,278 @@ html, body {
 
 .oauth-connect-link:hover {
     color: var(--accent-primary-hover);
+}
+
+/* ============================================
+   Composition & Pattern Styles
+   ============================================ */
+
+.badge-composition {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(99, 102, 241, 0.2));
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.badge-tools-count {
+    background: rgba(34, 211, 238, 0.15);
+    color: var(--accent-secondary);
+}
+
+.header-badge.badge-composition {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(99, 102, 241, 0.15));
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.composition-box {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(99, 102, 241, 0.05));
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+}
+
+.composition-intro {
+    margin-bottom: var(--space-md);
+}
+
+.composition-desc {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.composition-spec {
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* Pipeline Flow */
+.pipeline-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+}
+
+.pipeline-step {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-lg);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    width: 100%;
+    max-width: 300px;
+}
+
+.pipeline-step .step-num {
+    background: linear-gradient(135deg, #8b5cf6, var(--accent-primary));
+}
+
+.step-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.step-id {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.step-tool {
+    font-size: 0.7rem;
+    color: var(--accent-secondary);
+    font-family: var(--font-mono);
+}
+
+.step-arrow-down {
+    color: var(--text-muted);
+}
+
+/* Scatter-Gather Flow */
+.scatter-gather-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+}
+
+.sg-input, .sg-aggregate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.sg-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sg-branches {
+    display: flex;
+    gap: var(--space-lg);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.sg-branch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.scatter-target {
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--accent-secondary);
+}
+
+.scatter-target.scatter-pattern {
+    color: #a78bfa;
+    font-style: italic;
+}
+
+.sg-agg-ops {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--accent-success);
+}
+
+.sg-config-row {
+    display: flex;
+    gap: var(--space-lg);
+    justify-content: center;
+    margin-top: var(--space-sm);
+}
+
+.sg-config {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+/* Filter Pattern */
+.filter-display {
+    padding: var(--space-md);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    text-align: center;
+}
+
+.filter-predicate {
+    font-size: 0.9rem;
+    font-family: var(--font-mono);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    color: var(--accent-secondary);
+}
+
+/* Map-Each Pattern */
+.map-each-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    flex-wrap: wrap;
+}
+
+.array-bracket {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--text-muted);
+}
+
+.array-item {
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    color: var(--accent-secondary);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.map-each-inner {
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    padding: var(--space-sm) var(--space-md);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(99, 102, 241, 0.15));
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: var(--radius-sm);
+    color: #a78bfa;
+}
+
+/* Output Transform */
+.transform-mappings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--bg-primary);
+    border: 1px solid rgba(34, 211, 238, 0.3);
+    border-radius: var(--radius-md);
+}
+
+.transform-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) 0;
+}
+
+.transform-field-name {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 100px;
+}
+
+.transform-arrow {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.transform-path {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--accent-secondary);
+}
+
+.transform-literal {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--accent-success);
+}
+
+.transform-template {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--accent-warning);
+}
+
+.transform-other {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-muted);
 }
